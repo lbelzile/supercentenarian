@@ -1,4 +1,12 @@
 rm(list=ls())
+# Two files are used, italcent.rda and francent.rda
+# The first can be requested from the
+# National Institute of Statistics by registering at the Contact Center
+# (https://contact.istat.it) and mentioning the Semisupercentenarian
+# Survey and Marco Marsili as contact person.
+# 
+# The second data can be downloaded by registering on 
+# http://www.supercentenarians.org/
 # Load libraries and packages used in the analyses
 library(boot)  
 library(evd)
@@ -38,7 +46,7 @@ womunc <- which(as.logical(((as.numeric(italcent$gender)-1)+1) %%2 * !italcent$r
 womcens <- which(as.logical(((as.numeric(italcent$gender)-1)+1) %%2 * italcent$rightcens))
 
 if(figures){
-  fig <- "Fig1-yearvsage.tex"
+  fig <- "Fig1.tex"
   setwd(fig_dir)
   tikz(fig, width = dwidth, height = dheight, standAlone = TRUE)
 }
@@ -150,7 +158,7 @@ if(tables){
   addtorow <- list()
   addtorow$pos <- list(0)
   addtorow$command <-  paste0("threshold", paste0(" & $", 105:111, "$", collapse = " "), "\\\\\n", collapse = " ")
-  print(xtab1, file = "Table1_italIstat.tex", 
+  print(xtab1, file = "Table1a.tex", 
         size = "footnotesize", 
         floating.environment = "table*",  
         booktabs = TRUE, caption.placement = "top",
@@ -189,7 +197,7 @@ for(i in 1:length(h.sort.of)){
 
 if(figures){
   setwd(fig_dir)
-  fig <- "Fig2_cumhazard.tex" 
+  fig <- "Fig3.tex" 
   tikz(fig, width = dwidth ,height = dheight, standAlone = TRUE)
 }
 
@@ -271,7 +279,7 @@ cecdf <- mev:::.wecdf(KM$time, diff(c(0, 1-KM$surv)))
 
 if(figures){
   setwd(fig_dir)
-  fig <- "Fig8-qqplot.tex"
+  fig <- "Fig6.tex"
   tikz(fig, width = dwidth, height = dheight, standAlone = TRUE)
 }
 par(mar = c(4,4,0.4,0.4), mfrow = c(1,2), cex = 1, bty = "l")
@@ -419,7 +427,7 @@ for(i in 1:length(thresh)){
 probgamma0 <- pnorm(sign(param_gpd[,'shape'])*sqrt(param_gpd[,'deviance'] - prof_xizero))
 
 if(figures){
-  fig <- "Fig3-parameter_stability_b.tex"
+  fig <- "Fig2.tex"
   setwd(fig_dir)
   tikz(fig, width = dwidth, height = 0.8*dheight, standAlone = TRUE)
 }
@@ -471,7 +479,7 @@ for(i in 1:length(thresh)){
 }
 
 if(figures){
-  fig <- "Fig5-parameter_stability_cohort.tex"
+  fig <- "Fig4.tex"
   setwd(fig_dir)
   tikz(fig, width = dwidth, height = 1.6*dheight, standAlone = TRUE)
 }
@@ -524,7 +532,7 @@ ind_l2 <-  which(italcent$birth >= as_date("1906-01-01"))
 localhazard2 <- prof_gpd_hazard_confint(dat = dat[ind_l2], rightcens = rightcens[ind_l2], slow = slow[ind_l2], thresh = 105:109)
 
 if(figures){
-  fig <- "Fig7-local_hazard_cohort.tex"
+  fig <- "Fig7.tex"
   setwd(fig_dir)
   tikz(fig, width = dwidth, height = dheight, standAlone = TRUE)
 }
@@ -674,7 +682,7 @@ if(tables){
         sanitize.colnames.function = function(x){paste0("\\multicolumn{1}{c}{",x,"}")},
         sanitize.rownames.function = identity, 
         table.placement = "t!",
-        file = "Table3_italcent_credint.tex")
+        file = "Table3.tex")
   setwd(code_dir)
 }
 
@@ -798,7 +806,7 @@ ind.h <- ind.h[subseq]
 ind.h.exp <- ind.h.exp[subseq]
 if(figures){
   setwd(fig_dir)
-  fig <- "Fig14_splinehazard.tex"
+  fig <- "Fig8.tex"
   tikz(fig, width = dwidth, height = dheight, standAlone = TRUE)
 }
 par(mfrow=c(1, 2), mar = c(4, 4, 0.1, 0.1), bty = "l")
@@ -917,7 +925,7 @@ for(i in 1:length(thresh)){
   
   if(tables){
   setwd(table_dir)
-  print(xtab1, file = "Table3_franceIDL.tex", 
+  print(xtab1, file = "Table1b.tex", 
         size = "footnotesize", 
         floating.environment = "table*",   
         booktabs = TRUE, caption.placement = "top",
@@ -974,7 +982,7 @@ for(i in 1:length(thresh)){
 }
 
 if(figures){
-  fig <- "Fig11-parameter_stability_France.tex"
+  fig <- "Fig5.tex"
   setwd(fig_dir)
   tikz(fig, width = dwidth, height = 0.8*dheight, standAlone = TRUE)
 }
