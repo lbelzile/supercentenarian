@@ -1,6 +1,6 @@
 rm(list=ls())
 # Two files are used, italcent.rda and francent.rda
-# The first can be requested from the
+# The first can be bought for a small fee from the
 # National Institute of Statistics by registering at the Contact Center
 # (https://contact.istat.it) and mentioning the Semisupercentenarian
 # Survey and Marco Marsili as contact person.
@@ -203,13 +203,17 @@ if(figures){
 
 par(mar = c(4,5.5,0.1,0.1))
 # Plot of the Nelson-Aalen estimator
-cumhaz0 <- cumhaz0 + 105
 plot(time0, cumhaz0, 
      xlab='Survival time (in years)', 
      ylab='Conditional cumulative\n hazard above 105',
-     ylim=range(cumhaz0), bty = "l", type = "s", lwd = 2)
-id <- min(which(time0 > 108))
-abline(a = -time0[id]*0.69+cumhaz0[id], b = 0.69,col = scales::alpha(4, 0.5), lwd = 2)
+     yaxt="n", ylim=range(cumhaz0),
+     bty = "l", type = "s", lwd = 2,
+     panel.first = {
+       abline(a = -time0[id0]*0.69+cumhaz0[id0], b = 0.69,
+                           col = 4, lwd = 2)
+      })
+axis(side=2, at=0:7, labels=105:112, yaxs = "i")
+id0 <- min(which(time0 > 108))
 
 bands <- cumhazbands(time = time0, cumhaz = cumhaz0, type = "ptwise", 
                      transfo= "a", sigma.sq = cumhazvar0, confLevel = 0.95, n = length(xord))
@@ -220,7 +224,6 @@ bands <- cumhazbands(time = time0, cumhaz = cumhaz0, type = "band",
                      transfo= "a", sigma.sq = cumhazvar0, confLevel = 0.95, n = length(xord))
 lines(bands$time, cummax(bands$lower), col = "grey50", lty = 3, lwd = 2)
 lines(bands$time, bands$upper, col = "grey50", lty = 3, lwd = 2)
-
 
 if(figures){
   dev.off()
@@ -620,22 +623,22 @@ for(i in 1:9){
 # Bayesian analysis using HMC with vague priors (SI, Section F)
 
 # Only run the code if the file with the results is not provided
-if("stanresult_oldage.RData" %in% list.files()){
+if("Table3_draws.RData" %in% list.files()){
   run <- FALSE
 }
 # transform data to yearly scale
 library(rstan)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
-thresh <- seq(from = 0, by = 365.25/2, length = 14L)
+thresholdseq <- seq(from = 0, by = 365.25, length = 7L)
 
 # Test now model with a different threshold
-for(j in 1:length(thresh)){
-  datuy <- (italcent$numdays - u - thresh[j])/365.25
-  slowy <- pmax(0,  as.numeric(pmax(0, c1 - xcal)) - thresh[j])/365.25
+if(run){
+for(j in 1:length(thresholdseq)){
+  datuy <- (italcent$numdays - u - thresholdseq[j])/365.25
+  slowy <- pmax(0,  as.numeric(pmax(0, c1 - xcal)) - thresholdseq[j])/365.25
   ind <- which(datuy > 0)
-  if(run){
-    assign(x = paste0("fit", j), value = stan(file = 'GPD_cens.stan',
+  assign(x = paste0("fit", j), value = stan(file = 'GPD_cens.stan',
                                               data = list(n= length(datuy[ind]), x = datuy[ind], rightcens = rightcens[ind], slow = slowy[ind], xmax = max(datuy[ind])),
                                               warmup = 1000,
                                               iter = 26000,
@@ -643,22 +646,22 @@ for(j in 1:length(thresh)){
                                               chains = 5,
                                               init = c(1.5,0.01)))
   }
-}
-if(run){
-  save(list = ls(pattern="fit*"), file = "stanresult_oldage.RData")
+  save(list = ls(pattern="fit*"), file = "Table3_draws.RData")
   summary(fit5)
   traceplot(fit5)
   pairs(fit5)
 } else{
-  load("stanresult_oldage.RData")
+  load("Table3_draws.RData")
 }
 
-interv <- matrix(0, nrow = length(thresh), ncol = 5)
-for(j in 1:length(thresh)){
-  # iota is endpoint
-  iota <- (u + thresh[j])/365.25 + ifelse(extract(get(paste0("fit",j)), "xi")$xi < 0,
+interv <- matrix(0, nrow = length(thresholdseq), ncol = 5)
+pgammapos <- rep(0, length.out = length(thresholdseq))
+for(j in 1:length(thresholdseq)){
+  # tau is endpoint
+  tau <- (u + thresholdseq[j])/365.25 + ifelse(extract(get(paste0("fit",j)), "xi")$xi < 0,
                                           -extract(get(paste0("fit",j)), "sigma")$sigma/extract(get(paste0("fit",j)), "xi")$xi, Inf)
-  interv[j,] <- quantile(iota, c(0.025, 0.05, 0.5, 0.95, 0.975))
+  interv[j,] <- quantile(tau, c(0.025, 0.05, 0.5, 0.95, 0.975))
+  pgammapos[j] <- mean(extract(get(paste0("fit",j)), "xi")$xi >= 0)
 }
 
 medi <- format(round(interv[,3], 1), nsmall=1)
@@ -667,11 +670,10 @@ uppcr <- format(round(interv[,4], 1), nsmall=1)
 medi[which(medi == "  Inf")] <- "\\hphantom{00}\\infty\\hphantom{.}"
 lowcr[which(lowcr == "  Inf")] <- "\\hphantom{00}\\infty\\hphantom{.}"
 uppcr[which(uppcr == "  Inf")] <- "\\hphantom{00}\\infty\\hphantom{.}"
-tab <- cbind(round((u+thresh)/365.25,1), paste0("$", medi, "$ ($", lowcr, ", ", uppcr ,"$)"))
-colnames(tab) <- c("$u$", "$\\iota$")
-library(xtable)
-xtab <- xtable(tab, caption = c("Posterior median (90\\% credible intervals) for the upper limit to lifetime $\\iota$ (in years) using uninformative priors, as a function of the threshold $u$.", "Posterior median and credible intervals for the upper limit to lifetime"),
-               label = "tab_italcent_credint")
+tab <- cbind(paste0("$", round((u+thresholdseq)/365.25,1),"$"), paste0("$", medi, "$ ($", lowcr, ", ", uppcr ,"$)"), paste0("$", round(pgammapos, 2),"$"))
+colnames(tab) <- c("$u$", "endpoint $\\tau$ (90\\% CI)", "$\\Pr(\\gamma \\geq 0)$")
+xtab <- xtable(tab, caption = c("Posterior median (90\\% credible intervals) for the upper limit to lifetime $\\tau$ (in years) and posterior probability of infinite endpoint, both as a function of the threshold $u$."),
+               label = "tab_italcent_credint", align = "llrl")
 if(tables){
   setwd(table_dir)
   print(xtab, 
@@ -682,6 +684,7 @@ if(tables){
         sanitize.colnames.function = function(x){paste0("\\multicolumn{1}{c}{",x,"}")},
         sanitize.rownames.function = identity, 
         table.placement = "t!",
+        caption.placement = "top",
         file = "Table3.tex")
   setwd(code_dir)
 }
