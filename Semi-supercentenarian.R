@@ -18,20 +18,27 @@ library(xtable)
 library(tikzDevice)
 # The following package is not available on the CRAN
 # devtools::install_github("OpenIntroStat/openintro-r-package", subdir = "OIsurv")
-library(OIsurv)
-source(Supercentenarian_fn.R)
+source("Semi-supercentenarian_fn.R")
 dwidth <- 4
 dheight <- 2.5
-
+set.seed(1234)
 #Set directory when sourcing file
 # setwd(utils::getSrcDirectory()[1])
 #Set directory from Rstudio to current document
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-fig_dir <- paste0(substr(getwd(),start = 1, stop = nchar(getwd())-4), "figure")
+# TODO create figure and tables directories
 code_dir <- getwd()
-table_dir <- paste0(substr(getwd(),start = 1, stop = nchar(getwd())-4), "tables")
+fig_dir <- paste0(getwd(), "/figure")
+if(!dir.exists(fig_dir)){
+  dir.create("figure")
+}
+table_dir <- paste0(getwd(), "/tables")
+if(!dir.exists(table_dir)){
+  dir.create("tables")
+}
+
 # To save Figures and Tables (.tex format), change the following to TRUE
-figures <- tables <- FALSE
+figures <- tables <- TRUE
 # This database must be purchased from Istat
 load("italcent.rda")
 
@@ -770,7 +777,7 @@ boot.stat1 <- function(data, i, n.knots=5, knot.spacing=365, noise=0){
 
 # Warning: computationally intensive! Reduce number of bootstrap replicates to speed up calculations
 # the paper used R=5000
-system.time( rh.boot <- boot(data=data, statistic=boot.stat1, R=500L, 
+system.time( rh.boot <- boot(data=data, statistic=boot.stat1, R=5000L, 
                              n.knots=5, knot.spacing=365, noise=60))
 # indices for plotting output
 n.knots <- 5
@@ -812,8 +819,8 @@ if(figures){
   fig <- "Fig8.tex"
   tikz(fig, width = dwidth, height = dheight, standAlone = TRUE)
 }
-par(mfrow=c(1, 2), mar = c(4, 4, 0.1, 0.1), bty = "l")
-plot(rh.boot$t0[ind.x]+105, rh.boot$t0[ind.h], type="n", ylim=c(0, 1.5), 
+par(mfrow=c(1, 2), mar = c(4, 4, 0.1, 0.4), bty = "l")
+plot(rh.boot$t0[ind.x]+105, rh.boot$t0[ind.h], type="n", ylim = c(0, 1.5), 
      ylab="hazard function (1/year)", xlab="years", yaxs = "i",
      panel.first = {
        abline(v=knots + 105, lty=2, col="grey"); 
@@ -847,6 +854,7 @@ lines(rh.boot$t0[ind.x] + 105, haz.env.exp$overall[2, subseq], lty=2,lwd=2)
 
 if(figures){
   dev.off()
+  system(command = paste0("pdflatex ",fig_dir, "/", fig,"; rm *.aux; rm *.log"))
   setwd(code_dir)
 }
 
