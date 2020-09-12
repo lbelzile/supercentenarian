@@ -23,15 +23,15 @@ gpd_cens <- function(par, dat, rightcens, slow, expo = FALSE){
   ll <- 0
   #Contribution from observations in sampling frame (density divided by truncation interval)
   if(sum(!rightcens)>0){
-    ll <- sum(eva::dgpd(loc = 0, scale = par[1], shape = shape, x = dat[!rightcens], log = TRUE))
+    ll <- sum(evd::dgpd(loc = 0, scale = par[1], shape = shape, x = dat[!rightcens], log = TRUE))
     if(length(g1) > 0){
-      ll <- ll - sum(log(1-eva::pgpd(slow[g1], loc = 0, scale = par[1], shape = shape)))  #right censored individuals
+      ll <- ll - sum(log(1-evd::pgpd(slow[g1], loc = 0, scale = par[1], shape = shape)))  #right censored individuals
     }
   }
   if(sum(rightcens)>0){
-    ll <- ll +  sum(log(1-eva::pgpd(dat[rightcens], loc = 0, scale = par[1], shape = shape)))
+    ll <- ll +  sum(log(1-evd::pgpd(dat[rightcens], loc = 0, scale = par[1], shape = shape)))
     if(length(g2) > 0){
-      ll <- ll - sum(log(1-eva::pgpd(slow[g2], loc = 0, scale = par[1], shape = shape)))
+      ll <- ll - sum(log(1-evd::pgpd(slow[g2], loc = 0, scale = par[1], shape = shape)))
     }
   }
   if (!is.finite(ll)) {
@@ -74,7 +74,7 @@ obs.infomat <- function(theta, dat, rightcens, slow){
 #' Profile likelihood for endpoint
 #' 
 #' Profile likelihood for the endpoint of the generalized Pareto distribution
-#' for left-truncted and right-censored observations.
+#' for left-truncated and right-censored observations.
 #' 
 #' @inheritsParam gpd_cens
 #' @param psi value of the endpoint at which to compute the profile
@@ -474,11 +474,11 @@ gpd_dtrunc <- function(par, dat, slow, supp, expo = FALSE){
   }
   ll <- 0
   #Contribution from observations in sampling frame (density divided by truncation interval)
-  ll <- sum(eva::dgpd(loc = 0, scale = par[1], shape = shape, x = dat, log = TRUE))
+  ll <- sum(evd::dgpd(loc = 0, scale = par[1], shape = shape, x = dat, log = TRUE))
   if(shape < 0){
-    ll <- ll - sum(log(eva::pgpd(pmin(-par[1]/shape-1e-12, supp), loc = 0, scale = par[1], shape = shape) - eva::pgpd(slow, loc = 0, scale = par[1], shape = shape))) 
+    ll <- ll - sum(log(evd::pgpd(pmin(-par[1]/shape-1e-12, supp), loc = 0, scale = par[1], shape = shape) - evd::pgpd(slow, loc = 0, scale = par[1], shape = shape))) 
   } else {
-    ll <- ll - sum(log(eva::pgpd(supp, loc = 0, scale = par[1], shape = shape) - eva::pgpd(slow, loc = 0, scale = par[1], shape = shape))) 
+    ll <- ll - sum(log(evd::pgpd(supp, loc = 0, scale = par[1], shape = shape) - evd::pgpd(slow, loc = 0, scale = par[1], shape = shape))) 
   }
   if (!is.finite(ll)) {
     return(1e10)
@@ -531,27 +531,54 @@ fitgpddtrunc <- function(dat, thresh, supp, slow, expo = FALSE){
 #' This function returns 95% profile likelihood-based confidence intervals for 
 #' the shape parameter of the generalized Pareto distribution
 #' @inheritParams gpd_dtrunc
+#' @param xis vector of shape parameters
+#' @param confint logical; if \code{TRUE}, returns confidence interval rather than estimates
 #' @return estimate and 95% confidence interval for the shape parameter
-prof_gpd_dtrunc_xi_confint <- function(dat, supp, slow){
-  xis <- seq(-0.5, 0.5, length = 200)
+prof_gpd_dtrunc_xi <- function(dat, supp, slow, confint = FALSE, xis = NULL){
+  if(is.null(xis)){
+    xis <- seq(-0.5, 0.5, length = 200)
+  }
   mdat <- max(dat)
   dev <- sapply(xis, function(xi){
     opt <- optimize(f = function(lambda){gpd_dtrunc(par = c(lambda, xi),
                                                     dat = dat,  supp = supp, slow = slow)},
-                    interval = c(ifelse(xi < 0, mdat*abs(xi), 1e-8), 1e9), tol = 1e-10)
+                    interval = c(ifelse(xi < 0, mdat*abs(xi), 1e-8), 1e4), tol = 1e-10)
     c(-2*opt$objective, opt$minimum)
   })
   ms <- which.max(dev[1,])
-  opt_mle <- optim(f = function(theta){gpd_dtrunc(par = theta, dat = dat,  supp = supp, slow = slow)},
+  opt_mle <- optim(f = function(theta){
+    gpd_dtrunc(par = theta, dat = dat,  supp = supp, slow = slow)},
                    par = c(dev[2,ms],xis[ms]), method = "N", hessian = TRUE, 
-                   control = list(parscale = c(500, 0.01), reltol = 1e-10, maxit = 1000))
+                   control = list(parscale = c(1, 0.01), reltol = 1e-10, maxit = 1000))
   
   mle <- opt_mle$par       
   maxll <- -2*opt_mle$value
-  prof <- list(psi = xis, pll = dev[1,]-maxll, maxpll = 0, mle = mle, 
-               psi.max = mle[2], std.error = sqrt(solve(opt_mle$hessian)[2,2]))
-  confint <- confint_int(prof, parm = "profile")
-  confint
+  std_error <- try(sqrt(solve(opt_mle$hessian)[2,2]))
+  if(is.character(std_error)){
+    std_error <- NA
+  }
+  prof <- list(psi = xis, pll = dev[1,]-maxll, 
+               param = cbind(dev[2,], xis),
+               maxpll = 0, mle = mle, 
+               psi.max = mle[2], std.error = std_error)
+  if(confint){
+    confint_int(prof, parm = "profile")
+  } else{
+    prof
+  }
+}
+
+#' Sample observations from a doubly truncated generalized Pareto distribution
+#' 
+#' @param n sample size
+#' @param param scale and shape parameters of the generalized Pareto distribution
+#' @param lower scalar lower bound
+#' @param upper scalar upper bound
+#' @return a vector of \code{n} observations 
+revddtrunc <- function(n, param, lower, upper){
+  evd::qgpd(evd::pgpd(lower, scale = param[1], shape = param[2]) + 
+              runif(n)*diff(evd::pgpd(c(lower, upper), scale = param[1], shape = param[2])),
+            scale = param[1], shape = param[2])
 }
 
 #' Log-likelihood of doubly truncated exponential distribution
@@ -561,14 +588,322 @@ prof_gpd_dtrunc_xi_confint <- function(dat, supp, slow){
 #' @inheritParams gpd_dtrunc
 #' @return estimate and 95% confidence interval for the scale parameter
 prof_exp_dtrunc <- function(dat, supp, slow){
-  opt_mle <- optim(par = 1.5, fn = gpd_dtrunc, method = "Brent", lower = 0.1, upper = 3, dat = dat,
+  opt_mle <- optim(par = 1.5, fn = gpd_dtrunc, method = "Brent", lower = 0.01*mean(dat), upper = 50*mean(dat), dat = dat,
                    supp = supp, slow = slow, expo = TRUE, hessian = TRUE)
-  grid_theta <- c(opt_mle$par, seq(0.4, 3, length = 250L))
+  grid_theta <- c(opt_mle$par, seq(0.4*opt_mle$par, 3*opt_mle$par, length = 250L))
   dev <- -2*sapply(grid_theta, function(theta){
     gpd_dtrunc(par = theta, dat = dat, supp = supp, slow = slow, expo = TRUE)})
   confint_int(list(psi = sort(grid_theta), pll = dev[order(grid_theta)], 
                    maxpll = -2*opt_mle$value, psi.max = opt_mle$par, 
                    std.error = sqrt(solve(opt_mle$hessian)[1,1]),
-                   mle = c(opt_mle$par,sqrt(solve(opt_mle$hessian)[1,1]))),parm = "profile")
+                   mle = c(opt_mle$par,sqrt(solve(opt_mle$hessian)[1,1]))),
+              parm = "profile")
 }
+
+
+#' Likelihood for left-truncated and right-censored generalized Gompertz variates
+#'
+#' Computes the log-likelihood for Gompertz distribution.
+#'
+#' @param par vector of scale and shape
+#' @param dat vector of threshold exceedances
+#' @param rightcens logical indicating right-censoring (\code{TRUE} for censored)
+#' @param slow lower truncation limit
+#' @param expo logical; should an exponential model be fitted? Default to \code{FALSE}
+#' @return log-likelihood value
+gomp_cens <- function(par, dat, rightcens, slow, expo = FALSE){
+  scale <- par[1]
+  shape <- par[2]
+  if(scale <= 0 || shape <= 0){
+    return(1e10)
+  }
+  # Density of Gompertz
+  dgomp <- function(x, scale, shape, log = FALSE){
+    ll <- -log(scale) + (1-exp(shape/scale*x))/shape + shape/scale*x
+    if(log){
+      return(ll)
+    } else{
+      return(exp(ll))
+    }
+  }
+  # Survival function of Gompertz
+  sgomp <- function(x, scale, shape){
+    exp((1-exp(shape/scale*x))/shape)
+  }
+  
+  g1 <- intersect(which(!rightcens), which(slow > 0))
+  g2 <- intersect(which(rightcens), which(slow > 0))
+  ll <- 0
+  #Contribution from observations in sampling frame (density divided by truncation interval)
+  if(sum(!rightcens)>0){
+    ll <- sum(dgomp(scale = scale, shape = shape, x = dat[!rightcens], log = TRUE))
+    if(length(g1) > 0){
+      ll <- ll - sum(log(sgomp(x = slow[g1], scale = scale, shape = shape)))  #right censored individuals
+    }
+  }
+  if(sum(rightcens)>0){
+    ll <- ll +  sum(log(sgomp(x = dat[rightcens], scale = scale, shape = shape)))
+    if(length(g2) > 0){
+      ll <- ll - sum(log(sgomp(slow[g2], scale = scale, shape = shape)))
+    }
+  }
+  if (!is.finite(ll)) {
+    return(1e10)
+  }  else {
+    return(-ll)
+  }
+}
+
+#' Likelihood for doubly-truncated generalized Gompertz variates
+#'
+#' Computes the log-likelihood for Gompertz distribution.
+#'
+#' @param par vector of scale and shape
+#' @param dat vector of threshold exceedances
+#' @param supp upper truncation limit
+#' @param slow lower truncation limit
+#' @param expo logical; should an exponential model be fitted? Default to \code{FALSE}
+#' @return log-likelihood value
+gomp_dtrunc <- function(par, dat, supp, slow, expo = FALSE){
+  scale <- par[1]
+  shape <- par[2]
+  if(scale <= 0 || shape <= 0){
+    return(1e10)
+  }
+  if(isTRUE(any(slow < 0, dat < slow, dat > supp))){
+    return(1e10)
+  }
+  # Density of Gompertz
+  dgomp <- function(x, scale, shape, log = FALSE){
+    ll <- -log(scale) + (1-exp(shape/scale*x))/shape + shape/scale*x
+    if(log){
+      return(ll)
+    } else{
+      return(exp(ll))
+    }
+  }
+  # Survival function of Gompertz
+  sgomp <- function(x, scale, shape){
+    exp((1-exp(shape/scale*x))/shape)
+  }
+  
+  ll <- 0
+  #Contribution from observations in sampling frame (density divided by truncation interval)
+  ll <- sum(dgomp(scale = scale, shape = shape, x = dat, log = TRUE))
+  ll <- ll - sum(log(sgomp(slow, scale = scale, shape = shape) - sgomp(supp, scale = scale, shape = shape)))
+  if (!is.finite(ll)) {
+    return(1e10)
+  }  else {
+    return(-ll)
+  }
+}
+
+
+
+#' Profile likelihood for shape of generalized Pareto distribution
+#'
+#' Profile likelihood for the shape parameter of the generalized Pareto distribution
+#' for left-truncated and right-censored observations.
+#'
+#' @inheritsParam gpd_cens
+#' @param psi value of the shape at which to compute the profile
+#' @return a vector of length three containing twice the negative log-likelihood value, the shape parameter and the maximum of the nuisance lambda (i.e., the scale parameter).
+prof_gpd_cens_xi <- function(xi, dat, rightcens, slow){
+  if(abs(xi) > 1e-6){
+    opt <- optim(fn = function(lambda){gpd_cens(par = c(lambda, xi),
+                                                dat = dat,  rightcens = rightcens, slow = slow)},
+                 method = "Brent", par = 1, lower = ifelse(xi>=0, 1e-2, max(dat)*abs(xi)+1e-8) , upper = 15,
+                 control = list(reltol=1e-12))
+    res <- -2*opt$value
+    return(c(res, xi, opt$par))
+  } else{
+    rate <- exp_mle_lt_rc(dat = dat, rightcens = rightcens, slow = slow)
+    return(c(-2*gpd_cens(par = c(rate, 0), dat = dat,  rightcens = rightcens, slow = slow), 0, rate))
+  }
+  #attributes(res) <- list("param" = c(xi, opt$par))
+  #res
+}
+
+#' Profile likelihood for the endpoint of the generalized Pareto distribution
+#'
+#' Profile likelihood for the endpoint of the generalized Pareto distribution
+#' for left-truncated and right-censored observations.
+#'
+#' @inheritsParam gpd_cens
+#' @param endpoint value of the endpoint at which to compute the profile
+#' @return a vector of length three containing twice the negative log-likelihood value, the endpoint value and the maximum of the nuisance lambda (i.e., the shape parameter).
+prof_gpd_cens_endpoint <- function(endpoint, dat, rightcens, slow){
+  stopifnot(length(endpoint) == 1L)
+    opt <- optim(fn = function(xi){
+      sigma <- -endpoint*xi
+      gpd_cens(par = c(sigma, xi), dat = dat, rightcens = rightcens, slow = slow)},
+                 method = "Brent", par = -0.1, 
+      lower = -1, 
+      upper = -1e-8,
+                 control = list(reltol=1e-12))
+    res <- -2*opt$value
+    return(c(res, -opt$par*endpoint, opt$par))
+}
+
+#' Profile likelihood for the endpoint of the generalized Pareto distribution
+#'
+#' Profile likelihood for the endpoint of the generalized Pareto distribution
+#' for left-truncated and right-censored observations.
+#'
+#' @inheritsParam gpd_dtrunc
+#' @param endpoint value of the endpoint at which to compute the profile
+#' @return a vector of length three containing twice the negative log-likelihood value, the endpoint value and the maximum of the nuisance lambda (i.e., the shape parameter).
+prof_gpd_dtrunc_endpoint <- function(endpoint, dat, slow, supp){
+  stopifnot(length(endpoint) == 1L)
+  opt <- optim(fn = function(xi){
+    sigma <- -endpoint*xi
+    gpd_dtrunc(par = c(sigma, xi), dat = dat, supp = supp, slow = slow)},
+    method = "Brent", par = -0.1, 
+    lower = -1, 
+    upper = -1e-8,
+    control = list(reltol=1e-12))
+  res <- -2*opt$value
+  return(c(res, -opt$par*endpoint, opt$par))
+}
+
+#' Sample lifetime of semi-supercentenarians
+#' 
+#' Given parameters of a generalized Pareto distribution, sampling window and 
+#' birth dates with excess lifetimes, sample new observations; excess lifetime
+#' at \code{c1} are sampled from an exponential distribution, whereas
+#' the birth dates are samples from a jittered histogram-based distribution
+#' The new excess lifetime above the threshold are right-censored if they exceed
+#' \code{c2}.
+#' 
+#' @param n sample size
+#' @param pars vector of length 2 containing the scale and shape parameters of the generalized Pareto distribution
+#' @param xcal date at which individual reaches \code{u} years
+#' @param c1 date, first day of the sampling frame
+#' @param c2 date, last day of the sampling frame
+#' @param slow excess lifetime at \code{c1} whenever \code{xcal} precedes the latter.
+#' @return list with new birthdates (\code{xcal}), excess lifetime at \code{c1} (\code{slow}),
+#' excess lifetime above \code{u} (\code{dat}) and right-censoring indicator (\code{rightcens}).
+sample_lifetime <- function(n, pars, xcal, c1, c2, slow){
+  
+  sample_dates <- function(n, xcal, c1, c2, slow){
+    sample_slow <- function(n, slow){
+      sort(round(rexp(n, rate = 1/mean(365.25*slow[slow>0])))/365.25, decreasing = TRUE)
+    }
+    nday <- as.numeric(xcal[ind]-c1)
+    nday <- nday[nday>0]
+    nmax <- as.numeric(c2-c1)
+    sslow <- sample_slow(round(sum(slow>0)*n/length(slow)), slow = slow)
+    xhist <- hist(nday, plot = FALSE)
+    bins <- with(xhist, sample(length(mids), n-length(sslow), p=density, replace=TRUE)) # choose a bin
+    result <- round(runif(length(bins), xhist$breaks[bins], pmin(xhist$breaks[bins+1], nmax-1)))
+    list(xcal = as.Date(round(c(-sslow*365.25, sort(result))), origin = "2009-01-01"),
+         slow = c(sslow, rep(0, n-length(sslow))))
+  }
+  
+  traject <- evd::rgpd(n = n, loc = 0, scale = pars[1], shape = pars[2])
+  sdates <- sample_dates(n = n, xcal, c1, c2, slow)
+  lifeah <- pmax(1,pmin(round(365.25*(traject + sdates$slow)), as.numeric(c2-sdates$xcal)))
+  rcens_new <- lifeah == as.numeric(c2-sdates$xcal)
+  list(xcal = sdates$xcal, slow = sdates$slow, dat = lifeah/365.25, rightcens = rcens_new)
+}
+
+#' Likelihood root function for shape parameter of the generalized Pareto distribution
+#'
+#' This function returns the likelihood root of the profile log-likelihood for the shape of the generalized Pareto distribution with left-truncated and right-censored data.
+#' Specifically, \eqn{-r^2/2} is the profile likelihood and the two-sided p-value is\code{qchisq(p, 1)/2}.
+#'
+#' @param psi value of the shape at which to compute the p-value
+#' @param thetahat maximum likelihood estimates of the scale and shape parameters
+#' @inheritParams gpd_cens
+#' @return a p-value
+rfun_xi_gpd_cens <- function(psi, thetahat, dat, rightcens, slow){
+  if(abs(psi) > 1e-6){
+    llp <- prof_gpd_cens_xi(xi = psi, dat = dat, rightcens = rightcens, slow = slow)
+  } else{
+    rate <- exp_mle_lt_rc(dat = dat, rightcens = rightcens, slow = slow)
+    llp <- c(-2*gpd_cens(par = c(rate, 0), dat = dat,  rightcens = rightcens, slow = slow), 0)
+  }
+  -2*gpd_cens(par = thetahat, dat = dat, rightcens = rightcens, slow = slow) - llp[1]
+}
+
+
+
+#' Likelihood for left-truncated and right-censored extended generalized Pareto variates
+#'
+#' Computes the log-likelihood for extended generalized Pareto distribution.
+#' This distribution has survival function
+#' \deqn{(1+\xi\frac{\exp(\beta x/\sigma)-1}{\beta}\right)_{+}^{-1/\xi}}
+#' where \eqn{\sigma} is the scale parameter, \eqn{\beta} is a shape parameter of the Gompertz distribution, and 
+#' \eqn{\xi} is the shape parameter of the generalized Pareto distribution.
+#' @param par vector of scale and shape parameters
+#' @param dat vector of threshold exceedances
+#' @param rightcens logical indicating right-censoring (\code{TRUE} for censored)
+#' @param slow lower truncation limit
+#' @param expo logical; should an exponential model be fitted? Default to \code{FALSE}
+#' @return log-likelihood value
+exggp_cens <- function(par, dat, rightcens, slow){
+  #scale par[1]
+  # beta = par[2]; if zero, recover generalized Pareto
+  #xi =  par[3]; if zero, recover Gompertz
+  maxdat <- max(dat)
+  # both shape parameters can be negative, but the data
+  # must lie inside the support of the distribution
+  if(abs(par[3]) <= 1e-8 && abs(par[2]) <= 1e-8){
+    bounds <- par[1]
+  } else if(abs(par[3]) > 1e-8 && abs(par[2]) < 1e-8){
+    bounds <- c(par[1], ifelse(par[3] < 0, 1+par[3]*maxdat/par[1], Inf))
+  } else if(abs(par[3]) < 1e-8 && abs(par[2]) > 1e-8){
+    bounds <- par[1:2]
+  } else {
+    bounds <- c(par[1:2], 1+par[3]*(exp(par[2]*maxdat/par[1])-1)/par[2])
+  }
+  if(isTRUE(any(bounds <= 0))){
+    return(1e10)
+  }
+  g1 <- intersect(which(!rightcens), which(slow > 0))
+  g2 <- intersect(which(rightcens), which(slow > 0))
+  ll <- 0
+  sexggp <- function(dat, par){
+    if(abs(par[3]) < 1e-8 && abs(par[2]) < 1e-8){ #exponential
+      exp(-dat/par[1])
+    } else if(abs(par[3]) < 1e-8 && abs(par[2]) > 1e-8){ #Gompertz
+      exp(-exp(par[2]*dat/par[1])/par[2] + 1/par[2])
+    } else if(abs(par[3]) >= 1e-8 && abs(par[2]) < 1e-8){ #generalized Pareto
+      (1+dat*par[3]/par[1])^(-1/par[3])
+    } else if(abs(par[3]) >= 1e-8 && abs(par[2]) >= 1e-8){ #extended
+      (1+par[3]*(exp(par[2]*dat/par[1])-1)/par[2])^(-1/par[3]) 
+    }
+  }
+  dexggp <- function(dat, par){
+    if(abs(par[3]) < 1e-8 && abs(par[2]) < 1e-8){ 
+      exp(-dat/par[1])/par[1]
+    } else if(abs(par[3]) < 1e-8 && abs(par[2]) > 1e-8){ #Gompertz
+      exp(par[2]*dat/par[1] - exp(par[2]*dat/par[1])/par[2] + 1/par[2])/par[1]
+    } else if(abs(par[3]) >= 1e-8 && abs(par[2]) < 1e-8){ #generalized Pareto
+      (1+dat*par[3]/par[1])^(-1/par[3] - 1)/par[1]  
+    } else if(abs(par[3]) >= 1e-8 && abs(par[2]) >= 1e-8){ #extended
+      (par[3]*(exp(par[2]*dat/par[1]) - 1)/par[2] + 1)^(-1/par[3] - 1)*exp(par[2]*dat/par[1])/par[1]
+    }
+  }
+  #Contribution from observations in sampling frame (density divided by truncation interval)
+  if(sum(!rightcens)>0){
+    ll <- sum(log(dexggp(par = par, dat = dat[!rightcens])))
+    if(length(g1) > 0){
+      ll <- ll - sum(log(sexggp(dat = slow[g1], par = par)))  #right censored individuals
+    }
+  }
+  if(sum(rightcens)>0){
+    ll <- ll + sum(log(sexggp(dat = dat[rightcens], par = par)))
+    if(length(g2) > 0){
+      ll <- ll - sum(log(sexggp(dat = slow[g2], par = par)))
+    }
+  }
+  if (!is.finite(ll)) {
+    return(1e10)
+  } else {
+    return(-ll)
+  }
+}
+
+
 
