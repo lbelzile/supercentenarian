@@ -9,14 +9,11 @@ if(!isTRUE(is.character(wd_source)) && !isTRUE(is.character(wd_rstudio))){
 source("00-setup.R")
 # Functions for fitting the various model
 source("Semi-supercentenarian_fn.R")
-# This database must be purchased from Istat
-load("italcent.rda")
-
-
-
 ###################################################
 ## Analysis of the Italian semi-supercentenarian ##
 ###################################################
+# This database must be purchased from Istat
+load("italcent.rda")
 # 105 years threshold (criterion for inclusion in dataset)
 u <- 38351L
 # Calendar date at which individual reaches 105 years
@@ -56,18 +53,15 @@ source("10-gompertz_extendedgp_italcent.R")
 ##################################################
 # Data extracted October 2019
 load("francent.rda")
-u <- 38351L
+u <- 38350L
 xcal <- francent$birth + u
 # Calendar time for sampling frame
-c1a <- lubridate::dmy("01-01-1978")
-c1b <- lubridate::dmy("01-01-1987")
+c1 <- lubridate::dmy("01-01-1987")
 c2 <- lubridate::dmy("31-12-2017")
 
 # Lower truncation level, zero if individual reached 105 between c1 and c2
-francent$slow <- ifelse(francent$numdays > 110*365.24, 
-                        as.numeric(pmax(0, c1b - xcal)),
-                        as.numeric(pmax(0, c1a - xcal)))
-francent$supp <- as.numeric(pmax(0, c2 - xcal))
+francent$slow <- as.numeric(pmax(0, c1 - xcal))
+francent$supp <- as.numeric(c2 - xcal)
 
 
 # MLE of Generalized Pareto (GP) and exponential for French
@@ -84,7 +78,8 @@ source("13-gompertz_extendedgp_francent.R")
 
 # Figure 3: Power analysis for test of finite endpoint 
 # and power study for test of exponential distribution 
-source("14-power.R")
-
+source("14-power_shape.R")
+source("15-power_endpoint.R")
+source("16-power_plots.R")
 # Table 2: exponential distribution
-source("15-exponential.R")
+source("17-exponential.R")

@@ -13,3 +13,4 @@ http://www.supercentenarians.org/, and forwarding the proof
 of registration to Leo Belzile.
 
 The main script, `Semi_supercentenarian.R`, contains a description of the other files. The file `Semi_supercentenarian_fn.R` contains auxiliary functions (likelihoods, optimisation routine, etc.) called by the user.
+

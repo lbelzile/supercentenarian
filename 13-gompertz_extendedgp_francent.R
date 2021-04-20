@@ -8,13 +8,15 @@
 
 # Turn this switch on/off to save/load the results of the simulation
 save <- TRUE
-
+dat <- francent$numdays - u
+slow <- francent$slow
+supp <- francent$supp
 # Fit Gompertz model
 param_gomp <- matrix(0, nrow = length(thresh), ncol = 7L)
 colnames(param_gomp) <- c("thresh","scale","shape","deviance", "scale.stderror", "shape.stderror", "nu")
 for(i in 1:length(thresh)){
   #For each threshold, compute new threshold exceedances
-  datu <- francent$numdays - u - thresh[i]
+  datu <- dat - thresh[i]
   # Keep only exceedances
   ind <- which(datu > 0)
   datu <- datu[ind]/365.25
@@ -116,7 +118,7 @@ if(save){
       boot_lrt_gomp_vs_exp[b, j] <- 2*(pexpboot$minimum - vals$minimum)
     }
   }
-  boot_lrt_gomp_vs_exp[1,] <- pmax(0, param_exp[,"deviance"] + param_gomp[,"deviance"])
+  boot_lrt_gomp_vs_exp[1,] <- pmax(0, param_gomp[,"deviance"] - param_exp[,"deviance"])
   pvalboot <- apply(pmax(boot_lrt_gomp_vs_exp,0), 2, function(x){mean(x>=x[1])})
   save(file = "pvalboot_France_gompvsexp.Rdata", thresh, boot_lrt_gomp_vs_exp, pvalboot)
 } else{

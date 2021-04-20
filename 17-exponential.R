@@ -1,4 +1,3 @@
-
 # Table 2: parameter estimates for exponential
 # distribution above 108 (Istat, France) and 110 (IDL2016)
 # with gender-specific estimates and sample sizes
@@ -24,6 +23,11 @@ rcens <- italcent$rightcens[ind]
 gender <- italcent$gender[ind]
 datu <- datu[ind]/365.25
 slow <- italcent$slow[ind]/365.25
+
+ital_df <- data.frame(datu = datu, 
+                      slow = slow, 
+                      gender = gender,
+                      rcens = rcens)
 mle_istat_exp <- c(
   exp_mle_lt_rc(dat = datu, 
                 slow = slow, 
@@ -35,38 +39,39 @@ mle_istat_exp <- c(
                 slow = slow[gender == "male"],
                 rightcens = rcens[gender == "male"])
 )
-nsamp_istat <- c(sum(!rcens), 
-                 sum(!rcens[gender == "female"]),
-                 sum(!rcens[gender == "male"]))
+nsamp_istat <- c(length(gender), 
+                 sum(gender == "female"),
+                 sum(gender == "male"))
 stdev_istat_exp <- mle_istat_exp/sqrt(nsamp_istat)
 lci_istat_exp <- mle_istat_exp - qnorm(0.975)*stdev_istat_exp
 uci_istat_exp <- mle_istat_exp + qnorm(0.975)*stdev_istat_exp
 
 
 load("francent.rda")
-# Calendar date at which individual reaches 105 years
+# Calendar date at which individual reaches 108 years
 xcal <- francent$birth + u108
 # Calendar time for sampling frame
-c1a <- lubridate::dmy("01-01-1978")
-c1b <- lubridate::dmy("01-01-1987")
+c1 <- lubridate::dmy("01-01-1987")
 c2 <- lubridate::dmy("31-12-2017")
 
 # Lower truncation level, zero if individual reached 105 between c1 and c2
-francent$slow <- ifelse(francent$numdays > 110*365.24, 
-                        as.numeric(pmax(0, c1b - xcal)),
-                        as.numeric(pmax(0, c1a - xcal)))
-francent$supp <- as.numeric(pmax(0, c2 - xcal))    
+francent$slow <- as.numeric(pmax(0, c1 - xcal))
+francent$supp <- as.numeric(c2 - xcal)
 datu <- francent$numdays - u108
 ind <- which(datu > 0)
-slow <- francent$slow[ind]/365.25
+slow <- pmax(0, francent$slow[ind]/365.25)
 supp <- francent$supp[ind]/365.25
-datu <- (francent$numdays - u108)[ind]/365.25
+datu <- (francent$numdays[ind] - u108)/365.25
 gender <- francent$gender[ind]
+fran_df <- data.frame(datu = datu, 
+                      slow = slow, 
+                      supp = supp,
+                      gender = gender)
 opt_francent_all <- optim(fn = gpd_dtrunc, 
                           par = 1.4, 
                           method = "Brent",
-                          lower = 1,
-                          upper = 3,
+                          lower = 0.1,
+                          upper = 6,
                           hessian = TRUE,
                           dat = datu, 
                           supp = supp, 
@@ -75,8 +80,8 @@ opt_francent_all <- optim(fn = gpd_dtrunc,
 opt_francent_female <- optim(fn = gpd_dtrunc, 
                           par = 1.4, 
                           method = "Brent",
-                          lower = 1, 
-                          upper = 3, 
+                          lower = 0.1, 
+                          upper = 6, 
                           hessian = TRUE,
                           dat = datu[gender == "female"], 
                           supp = supp[gender == "female"], 
@@ -85,8 +90,8 @@ opt_francent_female <- optim(fn = gpd_dtrunc,
 opt_francent_male <- optim(fn = gpd_dtrunc, 
                           par = 1.4, 
                           method = "Brent",
-                          lower = 1, 
-                          upper = 3, 
+                          lower = 0.1, 
+                          upper = 6, 
                           hessian = TRUE,
                           dat = datu[gender == "male"], 
                           supp = supp[gender == "male"], 
@@ -102,20 +107,59 @@ stdev_france_exp <- sqrt(1/c(opt_francent_all$hessian,
 lci_france_exp <- mle_france_exp - qnorm(0.975)*stdev_france_exp
 uci_france_exp <- mle_france_exp + qnorm(0.975)*stdev_france_exp
 
+# Estimates for French women, excluding Jeanne Calment
+opt_francent_female_mJC <- optim(fn = gpd_dtrunc, 
+                             par = 1.4, 
+                             method = "Brent",
+                             lower = 0.1, 
+                             upper = 6, 
+                             hessian = TRUE,
+                             dat = datu[gender == "female" & datu != max(datu)], 
+                             supp = supp[gender == "female" & datu != max(datu)], 
+                             slow = slow[gender == "female" & datu != max(datu)],
+                             expo = TRUE)
+confint_exp_francent <- 
+  list(psi = seq(0.5,3, by = 0.01),
+       pll = - sapply(seq(0.5,3, by = 0.01), function(scale){
+         gpd_dtrunc(
+           par = scale, 
+       dat = datu, 
+       supp = supp, 
+       slow = slow, 
+       expo = TRUE)}),
+       psi.max = opt_francent_all$par,
+       maxpll = -opt_francent_all$value
+  )
+conf <- confint_int(object = confint_exp_francent, parm = "profile")
+# Confidence interval for scale
+round(conf, 2)
+# Confidence interval for hazard (reciprocal scale)
+round(1/conf, 2)
+# Confidence interval for prob
+round(exp(-1/conf), 2) 
+# Hazard ratio male/female
+opt_francent_female$par/opt_francent_male$par
+
+
 load("IDL2016.rda")
 # idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
-u110 <- min(idl2016$numdays)-1 #some people are 2-3 days from 110...
+u110 <- min(idl2016$numdays) #some people are 2-3 days from 110...
 # Calendar date at which individual reaches 110 years
 datu <- idl2016$numdays - u110
-slow <- pmax(0, (idl2016$slow - u110)/365.25)
-supp <- (idl2016$supp - u110)/365.25
-datu <- datu/365.25
-gender <- factor(idl2016$sex, labels = c("female","male"))
+ind <- datu > 0
+slow <- pmax(0, (idl2016$slow[ind] - u110)/365.25)
+supp <- (idl2016$supp[ind] - u110)/365.25
+datu <- datu[ind]/365.25
+gender <- factor(idl2016$sex[ind], labels = c("female","male"))
+idl_df <- data.frame(datu = datu, 
+                      slow = slow, 
+                      supp = supp,
+                      gender = gender)[idl2016$countrydeath[ind] != "FRA",]
 opt_IDL_all <- optim(fn = gpd_dtrunc, 
                           par = 1.4, 
                           method = "Brent",
-                          lower = 1,
-                          upper = 3,
+                          lower = 0.1,
+                          upper = 5,
                           hessian = TRUE,
                           dat = datu, 
                           supp = supp, 
@@ -124,8 +168,8 @@ opt_IDL_all <- optim(fn = gpd_dtrunc,
 opt_IDL_female <- optim(fn = gpd_dtrunc, 
                              par = 1.4, 
                              method = "Brent",
-                             lower = 1, 
-                             upper = 3, 
+                             lower = 0.1, 
+                             upper = 5, 
                              hessian = TRUE,
                              dat = datu[gender == "female"], 
                              supp = supp[gender == "female"], 
@@ -134,8 +178,8 @@ opt_IDL_female <- optim(fn = gpd_dtrunc,
 opt_IDL_male <- optim(fn = gpd_dtrunc, 
                            par = 1.4, 
                            method = "Brent",
-                           lower = 1, 
-                           upper = 3, 
+                           lower = 0.1, 
+                           upper = 5, 
                            hessian = TRUE,
                            dat = datu[gender == "male"], 
                            supp = supp[gender == "male"], 
@@ -166,9 +210,89 @@ tab <- cbind(paste0("$",nsamp_istat,"$"),
 tab <- as.data.frame(tab[c(2,3,1),])
 row.names(tab) <- c("women","men","all")
 colnames(tab) <- rep(c("$n$","$\\sigma_e$ ($95$\\% CI)"), length.out = 6)
+
 if(tables){
-  
+  setwd(table_dir)
   print(xtable(tab),
         file = "Table2.tex",
-        booktabs = TRUE, sanitize.text.function = identity)
+        booktabs = TRUE, 
+        sanitize.text.function = identity)
+  setwd(code_dir)
 }
+
+# Pooled estimates combining three database
+# but excluding French from IDL2016 to avoid
+# overlaps
+pooled_loglik_exp <- 
+  function(par, france, italy, idl2016){
+   gpd_dtrunc( 
+        par = par,
+        dat = france$datu, 
+        supp = france$supp, 
+        slow = france$slow,
+        expo = TRUE) + 
+   gpd_dtrunc( 
+         par = par,
+         dat = idl2016$datu, 
+         supp = idl2016$supp, 
+         slow = idl2016$slow,
+         expo = TRUE) + 
+  gpd_cens( 
+       par = par,
+       dat = italy$datu, 
+       rightcens = italy$rcens, 
+       slow = italy$slow,
+       expo = TRUE)
+  }
+
+# Compute maximum likelihood estimate
+mle_pooled <- optim(par = 1.4, 
+      fn = pooled_loglik_exp,
+      lower = 0.5, 
+      upper = 3, 
+      method = "Brent",
+      france = fran_df,
+      italy = ital_df,
+      idl2016 = idl_df)
+# Same, without French men
+mle_pooled_2 <- optim(par = 1.4, 
+                    fn = pooled_loglik_exp,
+                    lower = 0.5, 
+                    upper = 3, 
+                    method = "Brent",
+                    france = fran_df[fran_df$gender == "female",],
+                    italy = ital_df,
+                    idl2016 = idl_df)
+# This time without Jeanne Calment
+mle_pooled_3 <- optim(par = 1.4, 
+                      fn = pooled_loglik_exp,
+                      lower = 0.5, 
+                      upper = 3, 
+                      method = "Brent",
+                      france = fran_df[!which.max(fran_df$datu),],
+                      italy = ital_df,
+                      idl2016 = idl_df)
+
+# Likelihood ratio confidence intervals
+# These are invariant to reparametrization
+confint_exp_pooled <- 
+  list(psi = seq(0.5,3, by = 0.01),
+       pll = - sapply(seq(0.5,3, by = 0.01), function(scale){
+         pooled_loglik_exp(scale, 
+                           france = fran_df,
+                           italy = ital_df,
+                           idl2016 = idl_df[])}),
+       psi.max = mle_pooled$par,
+       maxpll = -mle_pooled$value
+  )
+
+conf <- confint_int(object = confint_exp_pooled, 
+                    parm = "profile")
+# 95% confidence intervals for the scale
+round(conf, 2)
+# For probability of survival one year
+round(exp(-1/conf), 2)
+
+# Difference between scales excluding some French
+mle_pooled_2$par - mle_pooled$par
+mle_pooled_3$par - mle_pooled$par

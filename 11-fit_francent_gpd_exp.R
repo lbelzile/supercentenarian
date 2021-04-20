@@ -28,14 +28,14 @@ for(i in 1:length(thresh)){
   ind <- which(datu > 0)
   vals <- optim(par = fit.gpd(datu/365.25)$est, fn = gpd_dtrunc, 
                 method = "N", dat = (datu[ind])/365.25,
-                supp = pmax(0,(supp[ind]-thresh[i]))/365.25, 
+                supp = (supp[ind]-thresh[i])/365.25, 
                 slow = (pmax(0, slow[ind]-thresh[i]))/365.25, expo = FALSE, 
                 control = list(parscale = c(1,0.01), 
                                reltol = 1e-10, maxit= 1e5),
                 hessian = TRUE)
   vals2 <- optim(par = fit.gpd(datu/365.25)$est[1], fn = gpd_dtrunc, 
                  method = "Brent", dat = (datu[ind])/365.25,
-                 supp = pmax(0,(supp[ind]-thresh[i]))/365.25, 
+                 supp = (supp[ind]-thresh[i])/365.25, 
                  slow = (pmax(0, slow[ind]-thresh[i]))/365.25, expo = TRUE,
                  lower = 0.05, upper = 200,
                  control = list(reltol = 1e-10, maxit= 1e5),

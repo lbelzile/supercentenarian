@@ -51,15 +51,12 @@ load("francent.rda")
 # Calendar date at which individual reaches 105 years
 xcal <- francent$birth + u108
 # Calendar time for sampling frame
-c1a <- lubridate::dmy("01-01-1978")
-c1b <- lubridate::dmy("01-01-1987")
+c1 <- lubridate::dmy("01-01-1987")
 c2 <- lubridate::dmy("31-12-2017")
 
 # Lower truncation level, zero if individual reached 110 between c1 and c2
-francent$slow <- ifelse(francent$numdays > 110*365.24, 
-                        as.numeric(pmax(0, c1b - xcal)),
-                        as.numeric(pmax(0, c1a - xcal)))
-francent$supp <- as.numeric(pmax(0, c2 - xcal))    
+francent$slow <- as.numeric(pmax(0, c1 - xcal))
+francent$supp <- as.numeric(c2 - xcal)
 datu <- francent$numdays - u108
 ind <- which(datu > 0)
 slow <- francent$slow[ind]/365.25

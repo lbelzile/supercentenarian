@@ -38,7 +38,7 @@ plot(x = thresh/365.25+105, confint_xi[,1],
      panel.first = abline(h = 0, col = "grey"), 
      pch = 20, col = 1, bty = "l", 
      ylab = "$\\gamma$", 
-     xlab = "threshold (in years)",
+     xlab = "threshold (years)",
      ylim = c(-0.3,1.1))
 for(i in 1:length(thresh)){
   arrows(x0 = thresh[i]/365.25+105, y0 = confint_xi[i,2], y1 = confint_xi[i,3], 
@@ -46,7 +46,10 @@ for(i in 1:length(thresh)){
 }
 plot(x = thresh/365.25+105, confint_exp[,1], type= "p", 
      panel.first = abline(h = 1.45142127, col = "grey"),
-     pch = 20, col = 1,bty = "l", ylab = "$\\sigma_e$", xlab = "threshold (in years)",
+     pch = 20, col = 1,
+     bty = "l", 
+     ylab = "$\\sigma_e$", 
+     xlab = "threshold (years)",
      ylim = c(0.7,2.1))
 for(i in 1:length(thresh)){
   arrows(x0 = thresh[i]/365.25+105, y0 = confint_exp[i,2], y1 = confint_exp[i,3], 
