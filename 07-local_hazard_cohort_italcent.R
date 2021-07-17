@@ -7,12 +7,12 @@
 #########################################################################################
 
 # Local hazard using all data (not shown)
-localhazard <- prof_gpd_hazard_confint(dat = dat, rightcens = rightcens, slow = slow, thresh = param_gpd[1,1]+0:6)
+localhazard <- prof_gpd_hazard_confint(dat = dat, rightcens = rightcens, slow = italcent$slow, thresh = param_gpd[1,1]+0:6)
 
 ind_l1 <-  which(italcent$birth < as_date("1906-01-01"))
-localhazard1 <- prof_gpd_hazard_confint(dat = dat[ind_l1], rightcens = rightcens[ind_l1], slow = slow[ind_l1], thresh = 105:111)
+localhazard1 <- prof_gpd_hazard_confint(dat = dat[ind_l1], rightcens = rightcens[ind_l1], slow = italcent$slow[ind_l1], thresh = 105:111)
 ind_l2 <-  which(italcent$birth >= as_date("1906-01-01"))
-localhazard2 <- prof_gpd_hazard_confint(dat = dat[ind_l2], rightcens = rightcens[ind_l2], slow = slow[ind_l2], thresh = 105:109)
+localhazard2 <- prof_gpd_hazard_confint(dat = dat[ind_l2], rightcens = rightcens[ind_l2], slow = italcent$slow[ind_l2], thresh = 105:109)
 # Note: some optimization calls yield warnings, but these are unconsequential
 
 if(figures){

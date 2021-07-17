@@ -1,9 +1,7 @@
 library(cobs)
 library(ggplot2)
-library(poorman)
 library(viridis)
 library(patchwork)
-library(tikzDevice)
 
 load("italcent.rda")
 maxital <- max(italcent$numdays/365.25)
@@ -246,7 +244,7 @@ g2 <- ggplot(data = power_endp, aes(x = endpoint, y = power, col = data)) +
                      limits = c(min(endpoints),151),
                      expand = c(0,0),
                      labels = paste0("$",seq(120, 150, by = 10),"$")) + 
-  xlab("upper limit to human lifespan") 
+  xlab("human lifespan limit") 
 
 
 if(figures){
@@ -263,9 +261,9 @@ if(figures){
 
 # Compute the power at different values of the endpoint
 # to add in the manuscript text
-round(rbind(
-  powersmoothIstat[which(endpts %in% c(125, 130, 135))],
-  powersmoothFrance[which(endpts %in% c(125, 130, 135))],
-  powersmoothIDL[which(endpts %in% c(125, 130, 135))],
-  powersmoothCombo[which(endpts %in% c(125, 130, 135))]
-),2)
+round(cbind(endpoints, 
+        powerIstat_ep,
+        powerIDL_ep,
+        powerFrance_ep, 
+        powerCombo_ep)[c(45,50,55),]
+,2)

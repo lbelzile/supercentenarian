@@ -23,14 +23,14 @@ c1 <- lubridate::dmy("01-01-2009")
 c2 <- lubridate::dmy("01-01-2016")
 
 # Lower truncation level, zero if individual reached 105 between c1 and c2
-slow <- as.numeric(pmax(0, c1 - xcal))
+italcent$slow <- as.numeric(pmax(0, c1 - xcal))
 # Figure 1: Lexis diagram
 source("01-Lexis_diagram_italcent.R")
 # MLE of Generalized Pareto (GP) and exponential for Istat
 # Table 1 (top panel)
 source("02-fit_italcent_gpd_exp.R")
-# Figure 6: Exponential QQ-plot for Istat
-source("03-exponential_QQ_plot.R")
+# Figure 6: Exponential QQ-plot and cumulative hazard for Istat
+source("03-goodness-of-fit_plots.R")
 # Additional analyses of SM, section E
 # Power for detecting difference in survival time per gender
 source("04-power_gender_italcent.R")
@@ -52,10 +52,12 @@ source("10-gompertz_extendedgp_italcent.R")
 ## Analysis of the French semi-supercentenarian ##
 ##################################################
 # Data extracted October 2019
+# We select a common window for semi-supercentenarian (105-109)
+# and supercentenarians (110+) to simplify the exposition
 load("francent.rda")
 u <- 38350L
 xcal <- francent$birth + u
-# Calendar time for sampling frame
+# Calendar time for (common) sampling frame
 c1 <- lubridate::dmy("01-01-1987")
 c2 <- lubridate::dmy("31-12-2017")
 
@@ -73,7 +75,7 @@ source("12-param_stability_francent.R")
 # Gompertz fit to French data
 # Table 3 (bottom panel)
 source("13-gompertz_extendedgp_francent.R")
-
+source("18-goodness_of_fit_plots.R")
 ##################################################
 
 # Figure 3: Power analysis for test of finite endpoint 

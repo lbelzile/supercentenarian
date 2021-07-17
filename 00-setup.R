@@ -1,14 +1,38 @@
 # Load libraries and packages used in the analyses
 # Figure numbers refer to the arXiv version of the paper
-library(boot)  
+# Recommended libraries are always installed alongside base R
+library(boot) 
+library(survival)
+
+library_lists <- c("evd",
+                   "mev",
+                   "xts",
+                   "lubridate",
+                   "poorman",
+                   "progress",
+                   "scales",
+                   "cobs",
+                   "numDeriv",
+                   "patchwork",
+                   "ggplot2",
+                   "viridis"
+                   )
+
+missing_lib <- which(!library_lists %in% installed.packages()[,1])
+for(i in seq_along(missing_lib)){
+  install.packages(missing_lib[i])
+}
 library(evd)
 library(mev)
 library(xts)
 library(lubridate)
-library(survival)
-# The following package is not available anymore from the CRAN
-# devtools::install_github("OpenIntroStat/openintro-r-package", subdir = "OIsurv")
-# library(OIsurv)
+library(poorman)
+library(progress)
+# Install longevity
+if(!require(longevity)){
+  devtools::install_github("lbelzile/longevity")
+  library(longevity)
+}
 # Set default width and height of figure
 dwidth <- 4
 dheight <- 2.5

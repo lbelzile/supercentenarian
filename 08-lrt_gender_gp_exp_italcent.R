@@ -14,8 +14,8 @@ for(i in 1:8){ # not enough males (12) beyond this stage to estimate parameters 
   ind <- as.logical(I(datu > 0) * I(italcent$gender=="male"))
   ind <- which(ind)
   vals <- optim(par = c(1.2,-0.1), fn = gpd_cens, method = "N", dat = (datu[ind])/365.25,
-                rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25, expo = FALSE, hessian = TRUE)
-  endpt_stderror <- sqrt(solve(obs.infomat(c(- vals$par[1]/vals$par[2], vals$par[2]), dat = (datu[ind])/365.25,rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25))[1,1])
+                rightcens = rightcens[ind], slow = (pmax(0, itcalent$slow[ind]-thresh[i]))/365.25, expo = FALSE, hessian = TRUE)
+  endpt_stderror <- sqrt(solve(obs.infomat(c(- vals$par[1]/vals$par[2], vals$par[2]), dat = (datu[ind])/365.25,rightcens = rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25))[1,1])
   param_gpd_men[i,] <- c(loc = (u + thresh[i])/365.25, vals$par, -2*vals$value, sqrt(diag(solve(vals$hessian))),
                          ifelse(vals$par[2] >0, Inf, (u + thresh[i])/365.25 - vals$par[1]/vals$par[2]), endpt_stderror,  length(ind))
 }
@@ -27,8 +27,8 @@ for(i in 1:8){
   datu <- dat - thresh[i]
   ind <- as.logical(I(datu > 0) * I(italcent$gender=="female"))
   vals <- optim(par = c(5,-0.01), fn = gpd_cens, method = "N", dat = (datu[ind])/365.25,
-                rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25, expo = FALSE, hessian = TRUE)
-  endpt_stderror <- sqrt(solve(obs.infomat(c(- vals$par[1]/vals$par[2], vals$par[2]), dat = (datu[ind])/365.25,rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25))[1,1])
+                rightcens = rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25, expo = FALSE, hessian = TRUE)
+  endpt_stderror <- sqrt(solve(obs.infomat(c(- vals$par[1]/vals$par[2], vals$par[2]), dat = (datu[ind])/365.25,rightcens = rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25))[1,1])
   param_gpd_women[i,] <- c(loc = (u + thresh[i])/365.25, vals$par, -2*vals$value, sqrt(diag(solve(vals$hessian))),
                            ifelse(vals$par[2] >0, Inf, (u + thresh[i])/365.25 - vals$par[1]/vals$par[2]), endpt_stderror,  length(ind))
 }
@@ -42,7 +42,7 @@ for(i in 1:9){
   datu <- dat - thresh[i]
   ind <- ind <- as.logical(I(datu > 0) * I(italcent$gender=="female"))
   vals <- optim(par = c(500), fn = gpd_cens, method = "Brent", lower = 0, upper = 800, dat = (datu[ind])/365.25,
-                rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25, expo = TRUE, hessian = TRUE)
+                rightcens = rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25, expo = TRUE, hessian = TRUE)
   param_exp_women[i,] <- c(u + thresh[i], vals$par, -2*vals$value, sqrt(solve(vals$hessian)))
 }
 
@@ -52,7 +52,7 @@ for(i in 1:9){
   datu <- dat - thresh[i]
   ind <- as.logical(I(datu > 0) * I(italcent$gender=="male"))
   vals <- optim(par = c(500), fn = gpd_cens, method = "Brent", lower = 0, upper = 800, dat = (datu[ind])/365.25,
-                rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25, expo = TRUE, hessian = TRUE)
+                rightcens = rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25, expo = TRUE, hessian = TRUE)
   param_exp_men[i,] <- c(u + thresh[i], vals$par, -2*vals$value, sqrt(solve(vals$hessian)))
 }
 # P-values

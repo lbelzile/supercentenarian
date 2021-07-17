@@ -14,10 +14,10 @@ for(i in 1:length(thresh)){
   datu <- dat - thresh[i]
   ind <- which(datu > 0)
   confint_xi[i,] <- prof_gpd_cens_xi_confint(dat = (datu[ind])/365.25,
-                                             rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25)
+                                             rightcens = rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25)
   confint_exp[i,] <- prof_exp_cens(dat = (datu[ind])/365.25,
-                                   rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25)
-  prof_xizero[i] <- nllhxizero(dat = (datu[ind])/365.25, rightcens = rightcens[ind], slow = (pmax(0, slow[ind]-thresh[i]))/365.25)
+                                   rightcens = rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25)
+  prof_xizero[i] <- nllhxizero(dat = (datu[ind])/365.25, rightcens = rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25)
   
 }
 

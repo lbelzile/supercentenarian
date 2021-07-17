@@ -60,23 +60,36 @@ profile_francent <- t(sapply(1:nendpoints, function(i){
                            dat = frex$datu, slow = frex$slow, supp = frex$supp)}))[,2:3]
 
 
-load("IDL2016.rda")
-idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
-u110 <- min(idl2016$numdays)-1 #some people are 2-3 days from 110...
-# Calendar date at which individual reaches 105 years
-datu <- idl2016$numdays - u110
-slow <- pmax(0, (idl2016$slow - u110)/365.25)
-supp <- (idl2016$supp - u110)/365.25
-datu <- datu/365.25
-maxidl <- max(idl2016$numdays/365.25)
-idlex <- data.frame(datu = datu, slow = slow, supp = supp)
-# Why is lower truncation level sometimes higher than the excess lifetime (in days)?
+# load("IDL2016.rda")
+# idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
+# u110 <- min(idl2016$numdays)-1 #some people are 2-3 days from 110...
+# # Calendar date at which individual reaches 105 years
+# datu <- idl2016$numdays - u110
+# slow <- pmax(0, (idl2016$slow - u110)/365.25)
+# supp <- (idl2016$supp - u110)/365.25
+# datu <- datu/365.25
+# maxidl <- max(idl2016$numdays/365.25)
+# idlex <- data.frame(datu = datu, slow = slow, supp = supp)
+
+idlex <- 
+  longevity::idl2021 %>%
+  filter(country != "FR",
+         ageyear >= 110) %>%
+  transmute(slow = as.numeric(pmax(0, c1 - x110))/365.25,
+            supp = as.numeric(c2 - x110)/365.25,
+            datu = (ndays - min(ndays) + 1L)/365.25
+  )
+maxidl <- max(idlex$datu) + 110
+
 profile_idl <- t(sapply(1:nendpoints, function(i){
   prof_gpd_dtrunc_endpoint(endpoint = (endpoints[i] - 110), 
                            dat = idlex$datu, slow = idlex$slow, supp = idlex$supp)}))[,2:3]
 
 
 if(save){
+  prbar <- progress_bar$new(total = nendpoints,
+                            format = "(:spin) [:bar] :percent",
+                            clear = FALSE)
   set.seed(20200824)
   power_ep_combo <- array(NA, dim = c(B, nendpoints))
   power_ep_francent <- array(NA, dim = c(B, nendpoints))
@@ -124,6 +137,7 @@ if(save){
     c(endpoint-pmax(args$maxital, args$maxfr, args$maxidl), shape + 1, -shape)}
   
   for(i in 1:nendpoints){
+    prbar$tick()
     #Generate new data
     if(endpoints[i] > maxfran){
       for(j in 1:ncol(bootsampfr)){
@@ -248,6 +262,18 @@ if(save){
         }
       } 
     }
+    save(endpoints, 
+         power_ep_italcent, 
+         power_ep_idl, 
+         power_ep_combo, 
+         power_ep_francent, 
+         file = "power_endpoint.RData")
   }
-  save(endpoints, power_ep_italcent, power_ep_idl, power_ep_combo, power_ep_francent, file = "power_endpoint.RData")
+  prbar$terminate()
+  save(endpoints, 
+       power_ep_italcent, 
+       power_ep_idl, 
+       power_ep_combo, 
+       power_ep_francent, 
+       file = "power_endpoint.RData")
 } 

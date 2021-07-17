@@ -905,5 +905,294 @@ exggp_cens <- function(par, dat, rightcens, slow){
   }
 }
 
+#' Nelson-Aalen estimator of the hazard for left-truncated right-censored observations
+#' 
+#' This estimator is an alternative to \code{survfit} from the \code{survival} package. It does not include a correction for ties.
+#' 
+#' @param time vector of failure or censoring time
+#' @param lefttrunc vector of left truncation time
+#' @param rightcens logical vector, \code{TRUE} if the observation is right-censored, \code{FALSE} otherwise
+#' @param level confidence level, with default value of 0.95
+#' @param prob percentiles, with default giving equisided confidence intervals
+#' @return a list with arguments
+#' \itemize{
+#' \item{time}{unique failure times}
+#' \item{n.event}{number of failures at \code{time}}
+#' \item{n.risk}{size of the risk set at \code{time}}
+#' \item{haz}{hazard at \code{time}}
+#' \item{cumhaz}{cumulative hazard at \code{time}}
+#' \item{var}{variance of the cumulative hazard at \code{time}}
+#' \item{confint}{log-transformed \code{level} confidence intervals for the cumulative hazard}
+#' \item{confband}{approximate log-transformed equal precision bands for the cumulative hazard}
+#'}
+nelson.aalen <- 
+  function(time,
+           lefttrunc,
+           rightcens,
+           tl,
+           tu,
+           level = 0.95,
+           prob = c((1 - level)/2, 1 - (1 - level)/2)
+  ){
+    stopifnot(
+      length(lefttrunc) == length(rightcens),
+      length(lefttrunc) == length(time),
+      isTRUE(all(time > lefttrunc)), 
+      is.logical(rightcens),
+      length(prob) == 2L,
+      length(level) == 1L,
+      level > 0 & level < 1,
+      all(prob > 0, prob < 1))
 
+    prob <- sort(prob)
+    # unique failure times
+    utimes <- unique(sort(time))
+    if(missing(tl)){
+      tl <- utimes[1] 
+      tl_index <- 1L
+    } else{
+      if(!tl %in% utimes){
+        stop("Lower bound for time interval must be one of the observed failure times.")
+      }
+      tl_index <- which(utimes == tl)
+      if(!tl > 0){
+        stop("Failure time must be strictly positive")
+      }
+    }
+    if(missing(tu)){
+      tu_index <- length(utimes) - 1L
+      tu <- utimes[tu_index]
+    } else{
+      if(!tu %in% utimes){
+        stop("Upper bound for time interval must be one of the observed failure times.")
+        tu_index <- which(utimes == tu)
+      }
+    }
+    stopifnot(tl < tu)
+    risk <- fail <- vector(mode = "numeric",
+                           length = length(utimes))
+    for(i in seq_along(utimes)){
+      ti <- utimes[i]
+      #risk set: not failed or censored
+      risk[i] <- sum(I(lefttrunc < ti)*I(ti <= time))
+      #failures: how many death at ti
+      fail[i] <- sum(time[!rightcens] == ti)
+    }
+    # Nelson-Aalen estimator
+    na_est <- cumsum(fail/risk)
+    na_haz <- fail/risk
+    # Variance estimator (Greenwood formula)
+    na_var <- cumsum((risk - fail) * fail/
+                       ((risk - 1) * risk^2))
+    # Log-transform pointwise confidence intervals
+    na_confint <- cbind(
+      na_est*exp(qnorm(prob[1])*na_var/na_est),
+      na_est*exp(qnorm(prob[2])*na_var/na_est))
+    # Equal precision bands
+    ep_critical <- function(d){
+      4*dnorm(d)/d+2*dnorm(d)*(d-1/d)*
+        0.5*(log(na_var[tu_index])-log(na_var[tl_index])) - (1-level)
+    }
+    dalpha <- uniroot(ep_critical, 
+                      interval = c(qnorm(level), 100))$root
+    na_confband <- cbind(
+      na_est*exp(-dalpha*na_var/na_est),
+      na_est*exp(dalpha*na_var/na_est))
+    return(list(
+      time = utimes,
+      n.event = fail,
+      n.risk = risk,
+      haz = na_haz,
+      cumhaz = na_est,
+      var = na_var,
+      confint = na_confint,
+      confband = na_confband
+    ))
+  }
 
+#' Confidence band, adapted from code by David Diez
+# cumhazbands <- function(time, 
+#                         cumhaz, 
+#                         type = c("ptwise", "band"), 
+#                         sigma.sq, 
+#                         transfo = c("none", "log", "arcsin"),
+#                         confLevel = c(0.9, 0.95, 0.99)) {
+#   transfo <- match.arg(transfo)
+#   type <- match.arg(type)
+#   t.U <- last(time)
+#   t.L <- first(time)
+#   n <- length(time)
+#   if(type == "band"){
+#     a.L <- n * sigma.sq[1]/(1 + n * sigma.sq[1])
+#     a.U <- n * sigma.sq[n]/(1 + n * sigma.sq[n])
+#     aU <- format(c(round(50 * a.U)/50, 0.01))[1]
+#     aL <- format(c(round(50 * a.L)/50, 0.01))[1]
+#     if (confLevel[1] == 0.9) {
+#       test <- try(data(hw.k10))
+#       if(is.matrix(test)){
+#         input <- hw.k10[aU, aL]
+#       } else{
+#         input <- OIsurv:::hw.k10 [aU, aL]
+#       }
+#     }
+#     else if (confLevel[1] == 0.95) {
+#       test <- try(data(hw.k05))
+#       if(is.matrix(test)){
+#         input <- hw.k05[aU, aL]
+#       } else{
+#         input <- OIsurv:::hw.k05[aU, aL]
+#       }
+#     }
+#     else if (confLevel[1] == 0.99) {
+#       test <- try(data(hw.k01))
+#       if(is.matrix(test)){
+#         input <- hw.k01[aU, aL]
+#       } else{
+#         input <- OIsurv:::hw.k01 [aU, aL]
+#       }
+#     }  else {
+#       stop("Only confidence levels of 0.90, 0.95 and 0.99\nare allowed.")
+#     }
+#     m.fact <- input * (1 + n * sigma.sq)/sqrt(n)
+#   } else{
+#     m.fact <- qnorm((1+confLevel[1])/2)*sqrt(sigma.sq)
+#   }
+#   CI <- matrix(NA, length(time), 2)
+#   if(transfo == "none"){
+#     CI[, 1] <- cumhaz - m.fact
+#     CI[, 2] <- cumhaz + m.fact
+#   } else if(transfo == "log"){
+#     CI[, 1] <- cumhaz*exp(-m.fact*sqrt(sigma.sq)/cumhaz)
+#     CI[, 2] <- cumhaz*exp(m.fact*sqrt(sigma.sq)/cumhaz)
+#   } else if(transfo == "arcsin"){
+#     CI[,1] <- -2*log(sin(pmin(pi/2, asin(exp(-cumhaz/2))+0.5*m.fact*sqrt(sigma.sq/(exp(cumhaz)-1)))))
+#     CI[,2] <- -2*log(sin(pmax(0, asin(exp(-cumhaz/2))-0.5*m.fact*sqrt(sigma.sq/(exp(cumhaz)-1)))))                         
+#   }
+#   CI[CI[, 1] < 0, 1] <- 0
+#   tR <- list(time = time, lower = CI[, 1], upper = CI[, 2])
+#   class(tR) <- "confBands"
+#   return(tR)
+# }
+
+cumhaz_gp <- function (x, 
+                       time, 
+                       time2 = NULL, 
+                       event = NULL, 
+                       status = NULL,
+                       thresh = 0, 
+                       ltrunc = NULL, 
+                       rtrunc = NULL,
+                       type = c("right", "left", "interval", "interval2"), 
+                      weights = rep(1,length(time)), 
+                      level = 0.95, 
+                      psi = NULL, 
+                      plot = FALSE) 
+{
+  stopifnot(level >  0 && level < 1,
+            length(level) == 1L,
+            is.numeric(x))
+  type <- match.arg(type)
+  mle <- longevity::fit_elife(time = time, 
+                   time2 = time2, 
+                   event = event, 
+                   status = status, 
+                   thresh = thresh, 
+                   ltrunc = ltrunc, 
+                   rtrunc = rtrunc, 
+                   type = type, family = "gp",
+                   weights = weights)
+  gp_cumhaz <- function(par, x){
+    log(1+x*par[2]/par[1])/par[2]
+  }
+  mle_cumhaz <- gp_cumhaz(par = mle$par, x = x)
+    if (mle$par[2] < 0 && x > -mle$par[1]/mle$par[2]) {
+      stop("Value of x is outside of the range of the distribution evaluated at the maximum likelihood estimate.")
+    }
+  # Given cumulative hazard, retrieve scale parameter
+    inv_cumhaz <- function(cumhaz, xi, x) {
+      as.numeric((xi*x)/(exp(xi*cumhaz)-1))
+    }
+    if (is.null(psi)) {
+      haz_stderror <- try(sqrt(diag(solve(numDeriv::hessian(func = function(par) {
+        longevity::nll_elife(
+          par = c(inv_cumhaz(par, xi = mle$par[2], x = x),
+                  mle$par[2]), 
+          time = time, 
+          time2 = time2, 
+          event = event, 
+          thresh = thresh, 
+          type = type, 
+          ltrunc = ltrunc, 
+          rtrunc = rtrunc, 
+          family = "gp",
+          weights = weights)
+      }, x = mle_cumhaz)))))
+      if (is.character(haz_stderror)) {
+        stop("Could not find a grid of values for the hazard confidence interval: please provide `psi` argument.")
+      }
+      psi <- mle_cumhaz + 
+        seq(from = -4 * haz_stderror, 
+            to = 4 * haz_stderror, 
+            length.out = 101L)
+    }
+    psi <- psi[psi > 0]
+    mdat <- max(time, time2, na.rm = TRUE) - thresh
+    ubound <- ifelse(x > mdat, x, mdat)
+    npll <- sapply(psi, function(cumhaz_i) {
+      opt <- optimize(f = function(xi) {
+        longevity::nll_elife(par = c(inv_cumhaz(cumhaz_i, xi = xi, x = x), xi),
+                             time = time,
+                             time2 = time2,
+                             event = event,
+                             ltrunc = ltrunc,
+                             rtrunc = rtrunc, 
+                             weights = weights, 
+                             family = "gp",
+                             type = type, 
+                             thresh = thresh)
+      }, upper = 1, lower = -1)
+      opt$objective
+    })
+  profile_confint <- function(psi, npll, psi_mle, nll_mle, 
+                              level = 0.95) {
+    stopifnot(is.numeric(psi_mle),
+              length(psi_mle) == 1L,
+              min(psi) < psi_mle & max(psi) > psi_mle,
+              length(psi) == length(npll),
+              nll_mle <= min(npll))
+    pred <- c(predict(smooth.spline(x = npll[psi < psi_mle] - 
+                                      nll_mle, y = psi[psi < psi_mle]), qchisq(level, 1)/2)$y, 
+              predict(smooth.spline(x = npll[psi > psi_mle] - nll_mle, 
+                                    y = psi[psi > psi_mle]), qchisq(level, 1)/2)$y)
+    return(pred)
+  }
+  mnpll <- which.min(npll)
+  if (npll[mnpll] < -mle$loglik) {
+    mle_haz <- psi[mnpll]
+    nll_mle <- npll[mnpll]
+  }  else {
+    nll_mle <- -mle$loglik
+  }
+  pconfint <- profile_confint(psi = psi, 
+                              psi_mle = mle_cumhaz,
+                              npll = npll, 
+                              nll_mle = nll_mle, 
+                              level = level)
+  shifted_npll <- -(npll + mle$loglik)
+  keep <- shifted_npll > -7
+  retv <- structure(list(hazards = psi[keep], 
+                         pll = shifted_npll[keep], 
+                         confint = pconfint, 
+                         par = as.numeric(mle_cumhaz), 
+                         level = level), 
+                    class = "elife_cumhazard")
+  if (plot) {
+    plot(retv)
+  }
+  return(invisible(retv))
+}
+
+ep_critical <- function(d, cumhazstd, tL, tU){
+  4*dnorm(d)/d+2*dnorm(d)*(d-1/d)*
+    (log(cumhazstd[tU])-log(cumhazstd[tL])) - 0.05
+}

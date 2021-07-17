@@ -10,7 +10,7 @@
 # Exceedances, with d=1 indicating full observation, d=0 indicating censoring
 #  x = event time, s = start of observation time, t= censoring/death time, all in days
 high <- as.numeric(c2 - xcal)
-data <- data.frame(x=dat, t=high, s=slow, d=1-rightcens, yob=lubridate::year(italcent$birth), gender=italcent$gender)
+data <- data.frame(x=dat, t=high, s=italcent$slow, d=1-rightcens, yob=lubridate::year(italcent$birth), gender=italcent$gender)
 
 
 # Use ordinary polynomial splines, with corresponding X matrix made with function make.X

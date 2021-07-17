@@ -17,7 +17,7 @@ library(progress)
 u108 <- 39447L #108 years
 xis <- seq(-0.25, 0.25, length.out = 101L)
 nxis <- length(xis)
-save <- TRUE # Uncomment to run the power study
+save <- TRUE #FALSE turn this switch to run the power study
 
 load("italcent.rda")
 # Calendar date at which individual reaches 108 years
@@ -71,20 +71,25 @@ profile_francent <- prof_gpd_dtrunc_xi(xi = xis,
 
 
 
-load("IDL2016.rda")
-idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
-# Lower truncation level sometimes higher than the excess lifetime (in days)?
-idl2016 <- idl2016[-which(idl2016$slow > idl2016$numdays),]
-u110 <- min(idl2016$numdays)-1 #some people are 2-3 days from 110...
-# Calendar date at which individual reaches 110 years
-datu <- idl2016$numdays - u110
-slow <- pmax(0, (idl2016$slow - u110)/365.25)
-supp <- (idl2016$supp - u110)/365.25
-datu <- datu/365.25
-
-
-idlex <- data.frame(datu = datu, slow = slow, supp = supp)
-# Why is lower truncation level sometimes higher than the excess lifetime (in days)?
+# load("IDL2016.rda")
+# idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
+# # Lower truncation level sometimes higher than the excess lifetime (in days)?
+# idl2016 <- idl2016[-which(idl2016$slow > idl2016$numdays),]
+# u110 <- min(idl2016$numdays)-1 #some people are 2-3 days from 110...
+# # Calendar date at which individual reaches 110 years
+# datu <- idl2016$numdays - u110
+# slow <- pmax(0, (idl2016$slow - u110)/365.25)
+# supp <- (idl2016$supp - u110)/365.25
+# datu <- datu/365.25
+# idlex <- data.frame(datu = datu, slow = slow, supp = supp)
+idlex <- 
+  longevity::idl2021 %>%
+  filter(country != "FR",
+         ageyear >= 110) %>%
+  transmute(slow = as.numeric(pmax(0, c1 - x110))/365.25,
+            supp = as.numeric(c2 - x110)/365.25,
+            datu = (ndays - min(ndays) + 1L)/365.25
+  )
 
 bootsamp <- matrix(0, ncol = length(datu), nrow = B)
 prof_xi_idl <- prof_gpd_dtrunc_xi(xi = xis,
@@ -144,7 +149,7 @@ if(save){
       bootsampital[rightcensb[,j],j] <- itex$uplim[j]
     }
     for(b in 1:B){
-      # prbar$tick()
+      prbar$tick()
       #Find maximum likelihood estimates
       mleboot_combo <- try(alabama::auglag(par = c(profile_italcent[i,2:1], profile_francent[i,1], profile_idl[i,1]),
                                            fn = combll,
@@ -277,8 +282,13 @@ if(save){
       }
     }
   }
-  pb$terminate()
-  save(xis, power_italcent, power_idl, power_combo, power_francent, shapes, file = "power.RData")
+  prbar$terminate()
+  save(xis, 
+       power_italcent, 
+       power_idl, 
+       power_combo, 
+       power_francent, 
+       shapes, file = "power.RData")
 } else{
   load("power.RData") 
 }
