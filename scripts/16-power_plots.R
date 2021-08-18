@@ -7,9 +7,11 @@ load("italcent.rda")
 maxital <- max(italcent$numdays/365.25)
 load("francent.rda")
 maxfran <- max(francent$numdays/365.25)
-load("IDL2016.rda")
-idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
-maxidl <- max(idl2016$numdays/365.25)
+# load("IDL2016.rda")
+# idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
+# maxidl <- max(idl2016$numdays/365.25)
+load(idl2021.rda)
+maxidl <- max(idlex$datu) + 110
 
 # Results from 14-power_shape.R output
 load("power.RData") 
@@ -36,7 +38,7 @@ powerCombo <- colMeans(cbind(abs(power_combo[,,2]) > qnorm(0.975),
 power_df <- data.frame(
   shape = rep(xis, length.out = 16*nxis),
   test = factor(rep(rep(c("Wald","directed likelihood root"), each = nxis), length.out = 16*nxis)),
-  data = factor(rep(c("Istat","France","IDL2016","combined"), each = 4*nxis)),
+  data = factor(rep(c("Istat","France","IDL","combined"), each = 4*nxis)),
   hypothesis = factor(rep(rep(c("two-sided","one-sided"), each = 2*nxis), length.out = 16*nxis)),
   power = c(powerIstat, powerfrancent, powerIDL, powerCombo))
 
@@ -103,13 +105,13 @@ points(endpoints, powerCombo_ep)
 
 power_endp <- data.frame(
   endpoint = rep(endpts, length.out = 4*length(endpts)),
-  data = factor(rep(c("Istat","France","IDL2016","combined"), each = length(endpts))),
+  data = factor(rep(c("Istat","France","IDL","combined"), each = length(endpts))),
   power = c(powersmoothIstat, powersmoothFrance, powersmoothIDL, powersmoothCombo)
 )
 
 power_df_ep <- data.frame(
   endpoint = rep(endpoints, length.out = 4*length(endpoints)),
-  data = factor(rep(c("Istat","France","IDL2016","combined"), each = length(endpoints))),
+  data = factor(rep(c("Istat","France","IDL","combined"), each = length(endpoints))),
   power = c(powerIstat_ep, powerFrance_ep, powerIDL_ep, powerCombo_ep)
 )
 
@@ -120,11 +122,11 @@ power_df_ep <- data.frame(
 lifetimes <- data.frame(
   death = c(italcent$numdays[italcent$numdays>365.25*115],
             francent$numdays[francent$numdays>365.25*115],
-            idl2016$numdays[idl2016$numdays>365.25*115]
+            idlex$numdays[idlex$numdays>365.25*115]
   )/365.25,
   data = factor(c(rep("Istat", sum(italcent$numdays>365.25*115)),
                   rep("France", sum(francent$numdays>365.25*115)),
-                  rep("IDL2016", sum(idl2016$numdays>365.25*115)))))
+                  rep("IDL", sum(idlex$numdays>365.25*115)))))
 
 
 critIstat <- apply(power_italcent[,xis == 0,], 2, quantile, c(0.025,0.05, 0.975))
@@ -174,7 +176,7 @@ powerAny<- 1-(1-powerIDL)*(1-powerfrancent)*(1-powerIstat)
 power_df <- data.frame(
   shape = rep(xis, length.out = 16*nxis),
   test = factor(rep(rep(c("Wald","directed likelihood root"), each = nxis), length.out = 16*nxis)),
-  data = factor(rep(c("Istat","France","IDL2016","combined"), each = 4*nxis)),
+  data = factor(rep(c("Istat","France","IDL","combined"), each = 4*nxis)),
   hypothesis = factor(rep(rep(c("two-sided","one-sided"), each = 2*nxis), length.out = 16*nxis)),
   power = c(powerIstat, powerfrancent, powerIDL, powerCombo))
 

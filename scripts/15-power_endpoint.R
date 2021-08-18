@@ -71,14 +71,7 @@ profile_francent <- t(sapply(1:nendpoints, function(i){
 # maxidl <- max(idl2016$numdays/365.25)
 # idlex <- data.frame(datu = datu, slow = slow, supp = supp)
 
-idlex <- 
-  longevity::idl2021 %>%
-  filter(country != "FR",
-         ageyear >= 110) %>%
-  transmute(slow = as.numeric(pmax(0, c1 - x110))/365.25,
-            supp = as.numeric(c2 - x110)/365.25,
-            datu = (ndays - min(ndays) + 1L)/365.25
-  )
+load(idl2021.rda)
 maxidl <- max(idlex$datu) + 110
 
 profile_idl <- t(sapply(1:nendpoints, function(i){

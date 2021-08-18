@@ -297,15 +297,8 @@ if(figures){
   setwd(code_dir)
 }
 
-idlex <- 
-  longevity::idl2021 %>%
-  filter(country != "FR",
-         ageyear >= 110) %>%
-  transmute(slow = as.numeric(pmax(0, c1 - x110))/365.25,
-            supp = as.numeric(c2 - x110)/365.25,
-            datu = (ndays - min(ndays) + 1L)/365.25
-  )
-
+# Load IDL data
+load("idl2021.rda")
 
 
 fit_exp_idl <- with(idlex,

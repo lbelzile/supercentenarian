@@ -82,14 +82,7 @@ profile_francent <- prof_gpd_dtrunc_xi(xi = xis,
 # supp <- (idl2016$supp - u110)/365.25
 # datu <- datu/365.25
 # idlex <- data.frame(datu = datu, slow = slow, supp = supp)
-idlex <- 
-  longevity::idl2021 %>%
-  filter(country != "FR",
-         ageyear >= 110) %>%
-  transmute(slow = as.numeric(pmax(0, c1 - x110))/365.25,
-            supp = as.numeric(c2 - x110)/365.25,
-            datu = (ndays - min(ndays) + 1L)/365.25
-  )
+load(idl2021.rda)
 
 bootsamp <- matrix(0, ncol = length(datu), nrow = B)
 prof_xi_idl <- prof_gpd_dtrunc_xi(xi = xis,

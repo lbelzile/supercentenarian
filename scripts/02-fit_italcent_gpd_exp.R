@@ -27,7 +27,7 @@ for(i in 1:length(thresh)){
                 fn = gpd_cens, 
                 method = "N", 
                 dat = (datu[ind])/365.25,
-                italcent$rightcens = italcent$rightcens[ind], 
+                rightcens = italcent$rightcens[ind], 
                 slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25, 
                 expo = FALSE, 
                 control = list(fnscale = c(1,0.1), reltol = 1e-12, maxit= 1e5),
@@ -35,7 +35,7 @@ for(i in 1:length(thresh)){
   # Compute standard errors
   endpt_stderror <- sqrt(solve(obs.infomat(c(- vals$par[1]/vals$par[2], vals$par[2]), 
                                            dat = (datu[ind])/365.25,
-                                           italcent$rightcens = italcent$rightcens[ind], 
+                                           rightcens = italcent$rightcens[ind], 
                                            slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25))[1,1])
   # Bundle estimates in a vector
   param_gpd[i,] <- c(loc = (u + thresh[i])/365.25, vals$par, -2*vals$value, sqrt(diag(solve(vals$hessian))),
@@ -50,7 +50,7 @@ for(i in 1:length(thresh)){
   datu <- dat - thresh[i]
   ind <- which(datu > 0)
   vals <- optim(par = c(500), fn = gpd_cens, method = "Brent", lower = 0, upper = 800, dat = (datu[ind])/365.25,
-                italcent$rightcens = italcent$rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25, expo = TRUE, hessian = TRUE)
+                rightcens =  italcent$rightcens[ind], slow = (pmax(0, italcent$slow[ind]-thresh[i]))/365.25, expo = TRUE, hessian = TRUE)
   param_exp[i,] <- c(u + thresh[i], vals$par, -2*vals$value, sqrt(solve(vals$hessian)))
 }
 # difference in deviance between nested models

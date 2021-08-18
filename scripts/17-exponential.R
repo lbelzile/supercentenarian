@@ -1,5 +1,5 @@
 # Table 2: parameter estimates for exponential
-# distribution above 108 (Istat, France) and 110 (IDL2016)
+# distribution above 108 (Istat, France) and 110 (IDL, rest)
 # with gender-specific estimates and sample sizes
 
 u108 <- 39447L #108 years
@@ -172,15 +172,9 @@ round(exp(-1/conf_fr), 2)
 # Hazard ratio male/female
 opt_francent_female$par/opt_francent_male$par
 
-idl_df <- 
-  longevity::idl2021 %>%
-  filter(country != "FR",
-         ageyear >= 110) %>%
-  transmute(slow = as.numeric(pmax(0, c1 - x110))/365.25,
-            supp = as.numeric(c2 - x110)/365.25,
-            datu = (ndays - min(ndays) + 1L)/365.25,
-            gender = gender
-  )
+load("idl2021.rda")
+idl_df <- idlex
+
 
 # load("IDL2016.rda")
 # # idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
