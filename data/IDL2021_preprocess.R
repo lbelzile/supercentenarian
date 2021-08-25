@@ -173,10 +173,11 @@ idl2021_csv <- idl2021 %>% select(! c(c1, c2, x110))
 write.csv(idl2021_csv, # removed unused information,
           file = "idl2021.csv",
           row.names = FALSE)
+u110 <- with(idl2021, min(ndays) - 1L)
 idlex <- idl2021 %>%   
-  transmute(slow = as.numeric(pmax(0, c1 - x110))/365.25,
-            supp = as.numeric(c2 - x110)/365.25,
-            datu = (ndays - min(ndays) + 1L)/365.25,
+  transmute(slow = as.numeric(pmax(0, ltrunc - u110))/365.25,
+            supp = as.numeric(rtrunc - u110)/365.25,
+            datu = (ndays - u110)/365.25,
             gender = gender)
 save(idlex, file = "IDL2021.rda", version = 2)
 

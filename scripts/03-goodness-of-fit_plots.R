@@ -8,19 +8,18 @@
 
 # Calendar time for sampling frame
 # # 105 years threshold (criterion for inclusion in dataset)
-u <- 38351L
+u108 <- 39447L
+load("italcent.rda")
 c1 <- lubridate::dmy("01-01-2009")
 c2 <- lubridate::dmy("01-01-2016")
-ind108 <- which((italcent$numdays - u) > 365*3)
-slow108 <-  pmax(0, italcent$slow[ind108]-365*3)
-numd108 <- italcent$numdays[ind108] - u - 365*3
+ind108 <- which((italcent$numdays - u108) > 0)
+slow108 <-  as.numeric(pmax(c1 - italcent$birth[ind108] - u108, 0))
+numd108 <- italcent$numdays[ind108] - u108
 uplim108 <- c2 - italcent$birth[ind108]
 cens108 <- italcent$rightcens[ind108]
-italcent_surv_108 <- Surv(time = slow108, 
-                          time2 = numd108,
-                          type = "counting", 
-                          event = !italcent$rightcens[ind108])
-
+italcent_surv_108 <- kaplan.meier(time = numd108,
+                                  lefttrunc = slow108,
+                                  rightcens = cens108)
 # Compute maximum likelihood estimator
 param_exp108  <- 
   exp_mle_lt_rc(dat = numd108, 
@@ -29,9 +28,11 @@ param_exp108  <-
 
 B <- 10000L
 set.seed(1234)
+# We condition on the censoring / truncation values
 bootsamp <- matrix(0, ncol = length(numd108), nrow = B)
 for(i in 1:ncol(bootsamp)){
   if(cens108[i]){
+    # the censored records are left untouched.
     bootsamp[,i] <- numd108[i]
   } else{
     # Due to censoring, individuals that are not censored are doubly truncated
@@ -48,12 +49,13 @@ for(j in 1:B){
                              slow = slow108)
   
   #Fit a Kaplan-Meier for left-truncated right-censored data
-  KM.b <- survfit(Surv(time = slow108, 
-                       time2 = bootsamp[j,], 
-                       type = "counting", 
-                       event = !cens108)~1)
+  KM.b <- kaplan.meier(time = bootsamp[j,],
+                       lefttrunc = slow108,
+                       rightcens = cens108)
+  
   #Extract the timing and make into a empirical distribution function (weighted)
-  cecdf <- mev:::.wecdf(KM.b$time, diff(c(0, 1-exp(-KM.b$cumhaz))))
+  cecdf <- mev:::.wecdf(KM.b$time, 
+                        -diff(c(KM.b$surv, 0)))
   # Evaluate on a regular grid to get confidence intervals
   qqpts[j,] <- sort(qexp(cecdf(seq(0, 2800, length = sum(!cens108))),
                          rate = 1/thetab[j]))
@@ -61,44 +63,26 @@ for(j in 1:B){
   qqptsb[j,] <- sort(qexp(cecdf(bootsamp[j,][!cens108]), 
                           rate = 1/thetab[j]))
 }
-surv_obj <- Surv(time = slow108/365.25, 
-                 time2 = numd108/365.25, 
-                 type = "counting", 
-                 event = !cens108)
-KM <- survfit(surv_obj~1)
-cecdf <- mev:::.wecdf(KM$time, diff(c(0, 1-KM$surv)))
+surv_obj <-  kaplan.meier(time = numd108/365.25,
+                          lefttrunc = slow108/365.25, 
+                          rightcens = cens108)
 
-# Plot positions
+#Extract the timing and make into a empirical distribution function (weighted)
+cecdf <- mev:::.wecdf(surv_obj$time, 
+                      -diff(c(surv_obj$surv, 0)))
+# Plotting positions (x-axis)
 xpos <- (cecdf(numd108[!cens108]/365.25) - cecdf(slow108[!cens108]/365.25))/(1-cecdf(slow108[!cens108]/365.25))
 Fa <- pexp(slow108[!cens108],rate = 1/param_exp108)
 txpos <- qexp(Fa + (1-Fa)*xpos, rate = 1/param_exp108)/365.25 + 108
+env <- boot::envelope(mat = qqpts) 
 
-# Fit nonparametric cumulative hazard
-npfit <- survfit(surv_obj~1,
-                 stype = 2,
-                 ctype = 1, #Nelson-Aalen = 1, 
-                 #Fleming-Harrington=2
-                 conf.type = "log")
+# Fit nonparametric cumulative hazard via Nelson--Aalen
+npfit <- nelson.aalen(time = numd108/365.25,
+                      lefttrunc = slow108/365.25, 
+                      rightcens = cens108)
 
-# # This uses arguments from Kendall (2007)
-# # to derive confidence bands through optimization
-# # Caveat: only applies to objects from "survival"
-# optband <- optband::opt.ci(
-#   survi = npfit, 
-#   conf.level = 0.95, 
-#   fun = "cumhaz", samples = 1)
-
-
-# Critical value
-dalpha <- uniroot(ep_critical,
-                  cumhazstd = npfit$std.chaz,
-                  tL = 1,
-                  tU = length(npfit$std.chaz),
-                  interval = c(2, 5))$root
-# Compute log transformed bands
-cumhaz.log.confint <- cbind(
-  npfit$cumhaz*exp(-dalpha*npfit$std.chaz/npfit$cumhaz),
-  npfit$cumhaz*exp(dalpha*npfit$std.chaz/npfit$cumhaz))
+# Log transformed bands
+cumhaz.log.confint <- npfit$confband
 
 # Fit exponential model
 exp_fit <- longevity::prof_exp_scale(
@@ -132,64 +116,78 @@ if(figures){
   setwd(fig_dir)
   fig <- "Fig6.tex"
   tikz(fig,
-       width = 1.2*dwidth, 
+       width = 1.42*dwidth, 
        height = 1.2*dheight, 
        standAlone = TRUE)
 }
- par(mar = c(4,4,0.4,0.4), mfrow = c(1,2), cex = 1, bty = "l")
-# plot(x = NA,
-#      pch = 20, bty = "l", xlab = "theoretical quantiles", ylab = "observed quantiles",
-#      panel.first = {abline(a=0, b=1)}, yaxs = "i", xaxs = "i",
-#      ylim = 108+c(0, 3000)/365.25, xlim = 108+c(0, 3000)/365.25)
-# for(i in 1:100){
-#   lines(y = sort(bootsamp[i,!cens108])/365.25+108, qqptsb[j,]/365.25+108, 
-#         lty = 2, col = scales::alpha(colour = "black", 0.2))
-# }
-points(y = sort(numd108[!cens108])/365.25+108,
-       x = sort(qexp(cecdf(numd108[!cens108]), 
-                     rate = 1/param_exp108))/365.25+108, 
-       pch = 1, 
-       cex = 0.8)
-points(y = sort(numd108[!cens108])/365.25+108,
-       x = sort(qexp(cecdf(numd108[!cens108]), 
-                     rate = 1/param_exp108))/365.25+108, 
-       pch = 20, 
-       cex = 0.2, 
-       col = "white")
+par(mar = c(4,4,0.4,0.4), 
+     mfrow = c(1,2), 
+     cex = 1, 
+     bty = "l")
 plot(y = numd108[!cens108]/365.25+108, 
      x = txpos,
      pch = 20, 
      bty = "l", 
-     xlab = "theoretical quantiles", 
-     ylab = "observed quantiles",
+     xlab = "", 
+     ylab = "",
      panel.first = {abline(a=0, b=1)}, 
      yaxs = "i", 
      xaxs = "i",
-     ylim = 108+c(0, 3000)/365.25, 
-     xlim = 108+c(0, 3000)/365.25, 
+     ylim = 108+c(0, 3100)/365.25, 
+     xlim = 108+c(0, 3100)/365.25, 
      cex = 0.8)
-env <- boot::envelope(mat = qqpts) 
+mtext(text = "theoretical quantiles",
+      side = 1,
+      line = 2)
+mtext(text = "empirical quantiles",
+      side = 2,
+      line = 2)
+
 ss <- seq(0, 2800, length = sum(!cens108))/365.25+108
-lines(y = ss, env$point[1,]/365.25+108, lty = 2, lwd = 1.5)
-lines(y = ss, env$point[2,]/365.25+108, lty = 2, lwd = 1.5)
-lines(y = ss, env$overall[1,]/365.25+108, lty = 3, lwd = 1.5)
-lines(y = ss, env$overall[2,]/365.25+108, lty = 3, lwd = 1.5)
+lines(y = ss, 
+      x = env$point[1,]/365.25+108, 
+      lty = 2, 
+      lwd = 1.5)
+lines(y = ss, 
+      x = env$point[2,]/365.25+108, 
+      lty = 2, 
+      lwd = 1.5)
+lines(y = ss, 
+      x = env$overall[1,]/365.25+108, 
+      lty = 3, 
+      lwd = 1.5)
+lines(y = ss, 
+      x = env$overall[2,]/365.25+108, 
+      lty = 3, 
+      lwd = 1.5)
 
 
 # Plot the cumulative hazard function along with fitted model
-plot(#optband, 
-     #cumhaz = TRUE, 
-     x = npfit$time,
-     y = npfit$cumhaz,
+plot(x = c(npfit$time, 1e10),
+     y = c(npfit$cumhaz, max(npfit$cumhaz)),
      bty = "l",
      xaxs = "i",
      yaxs = "i",
-     # xaxt = "n",
+     xaxt = "n",
+     lwd = 2,
      xlim = c(0,7),
      ylim = c(0,7),
+     yaxt = 'n',
      type = "s",
-     xlab = "excess lifetime above 108",
-     ylab = "conditional cumulative hazard")
+     xlab = "",
+     ylab = "")
+axis(side = 1,
+     at = 0:7,
+     labels = c("$0$","","$2$","","$4$","","$6$",""))
+axis(side = 2,
+     at = 0:7,
+     labels = c("$0$","","$2$","","$4$","","$6$",""))
+mtext(text = "excess lifetime above 108",
+      side = 1,
+      line = 2)
+mtext(text = "conditional cumulative hazard",
+      side = 2,
+      line = 2)
 lines(x = npfit$time, 
       y = cumhaz.log.confint[,1],
       lty = 2,
@@ -198,16 +196,13 @@ lines(x = npfit$time,
       y = cumhaz.log.confint[,2],
       lty = 2,
       type = "s")
-# axis(side = 1, 
-#      at = seq(0L, 10L, by = 2L), 
-#      labels = paste0("$", seq(108L, 118L, by = 2L)))
 # Add exponential pointwise confidence intervals
 # Because there is a single parameter and the cumulative
 # hazard is linear in the parameter, we need only compute
 # the profile likelihood and appeal to invariance of maximum
 # likelihood estimators for the curves
 polygon(x = c(0,7,7), 
-        y = c(0,7/exp_fit[2],7/exp_fit[3]),
+        y = c(0, 7/exp_fit[2], 7/exp_fit[3]),
         col = scales::alpha("blue", alpha = 0.1),
         border = NA)
 abline(a = 0, b = 1/exp_fit[1], col = 4)

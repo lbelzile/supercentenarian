@@ -172,7 +172,7 @@ round(exp(-1/conf_fr), 2)
 # Hazard ratio male/female
 opt_francent_female$par/opt_francent_male$par
 
-load("idl2021.rda")
+load("IDL2021.rda")
 idl_df <- idlex
 
 
@@ -254,7 +254,7 @@ colnames(tab) <- rep(c("$n$","$\\sigma_e$ ($95$\\% CI)"), length.out = 6)
 
 if(tables){
   setwd(table_dir)
-  print(xtable(tab),
+  print(xtable::xtable(tab),
         file = "Table2.tex",
         booktabs = TRUE, 
         sanitize.text.function = identity)

@@ -10,7 +10,7 @@ maxfran <- max(francent$numdays/365.25)
 # load("IDL2016.rda")
 # idl2016 <- idl2016[!idl2016$countrydeath == "FRA",]
 # maxidl <- max(idl2016$numdays/365.25)
-load(idl2021.rda)
+load(IDL2021.rda)
 maxidl <- max(idlex$datu) + 110
 
 # Results from 14-power_shape.R output

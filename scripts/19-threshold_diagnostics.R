@@ -13,17 +13,30 @@ u108 <- 39447L
 # comparing the piecewise generalized Pareto
 # with the generalized Pareto distribution.
 
+load("francent.rda")
+# Calendar date at which individual reaches 108 years
+xcal <- francent$birth + u105
+# Calendar time for sampling frame
+c1 <- lubridate::dmy("01-01-1987")
+c2 <- lubridate::dmy("31-12-2017")
 
-fit_gppiece <- with(francent,
+# Lower truncation level, zero if individual reached 105 between c1 and c2
+francent$slow <- as.numeric(pmax(0, c1 - xcal))
+francent$supp <- as.numeric(c2 - xcal)
+thresh_fr <- c(108, with(francent, 
+     quantile(numdays[numdays > 365.25*108],
+     c(0.2,0.4,0.6,0.8))/365.25)) - 105
+     
+fit_gppiece_fr <- with(francent,
      longevity::fit_elife(time = (numdays - u105)/365.25,
                           ltrunc = slow/365.25,
                           rtrunc = supp/365.25,
-                          thresh = c(3, 5, 7), #108,110,112
+                          thresh = thresh_fr, #108,110,112
                           family = "gppiece",
                           restart = TRUE)
      )
 
-fit_gp <- with(francent,
+fit_gp_fr <- with(francent,
                longevity::fit_elife(time = (numdays - u105)/365.25,
                                     ltrunc = slow/365.25,
                                     rtrunc = supp/365.25,
@@ -31,7 +44,7 @@ fit_gp <- with(francent,
                                     family = "gp",
                                     restart = TRUE)
 )
-fit_exp <- with(francent,
+fit_exp_fr <- with(francent,
                longevity::fit_elife(time = (numdays - u105)/365.25,
                                     ltrunc = slow/365.25,
                                     rtrunc = supp/365.25,
@@ -40,9 +53,88 @@ fit_exp <- with(francent,
                                     restart = TRUE)
 )
 # Likelihood ratio test
-anova(fit_gppiece, fit_gp)
-anova(fit_gp, fit_exp)
-anova(fit_gppiece, fit_exp)
+anova(fit_gppiece_fr, fit_gp_fr)
+anova(fit_gppiece_fr, fit_exp_fr)
+# anova(fit_gp_fr, fit_exp_fr)
+
+thresh_idl <- c(0, quantile(idlex$datu, c(0.2,0.4,0.6,0.8)))
+fit_gppiece_idl <- with(idlex,
+                       longevity::fit_elife(time = datu,
+                                            ltrunc = slow,
+                                            rtrunc = supp,
+                                            thresh = thresh_idl, 
+                                            family = "gppiece",
+                                            restart = TRUE)
+)
+
+fit_gp_idl <- with(idlex,
+                  longevity::fit_elife(time = datu,
+                                       ltrunc = slow,
+                                       rtrunc = supp,
+                                       family = "gp",
+                                       restart = TRUE)
+)
+fit_exp_idl <- with(idlex,
+                   longevity::fit_elife(time = datu,
+                                        ltrunc = slow,
+                                        rtrunc = supp,
+                                        family = "exp",
+                                        restart = TRUE)
+)
+# Likelihood ratio test
+anova(fit_gppiece_idl, fit_gp_idl)
+anova(fit_gppiece_idl, fit_exp_idl)
+# anova(fit_gp_idl, fit_exp_idl)
+
+
+
+load("italcent.rda")
+# Calendar date at which individual reaches 108 years
+italcent$xcal <- italcent$birth + u108
+# Calendar time for sampling frame
+c1 <- lubridate::dmy("01-01-2009")
+italcent$slow <- as.numeric(pmax(0, c1 - italcent$xcal))
+# Lower truncation level, zero if individual reached 108 between c1 and c2
+
+# Repeat the procedure with Istat data
+thresh_it <- c(108, with(italcent,
+                       quantile(numdays[numdays > 108*365.25],
+                           c(0.2,0.4,0.6,0.8)))/365.25)
+fit_gppiece_it <- with(italcent,
+                    longevity::fit_elife(time = numdays/365.25,
+                                         ltrunc = slow/365.25,
+                                         thresh = thresh_it, 
+                                         event = !rightcens,
+                                         type = "right",
+                                         family = "gppiece",
+                                         restart = TRUE)
+)
+
+fit_gp_it <- with(italcent,
+               longevity::fit_elife(time = numdays/365.25,
+                                    ltrunc = slow/365.25,
+                                    thresh = 108, 
+                                    event = !rightcens,
+                                    type = "right",
+                                    family = "gp",
+                                    restart = TRUE)
+)
+fit_exp_it <- with(italcent,
+               longevity::fit_elife(time = numdays/365.25,
+                                    ltrunc = slow/365.25,
+                                    thresh = 108, 
+                                    event = !rightcens,
+                                    type = "right",
+                                    family = "exp",
+                                    restart = TRUE)
+)
+# Likelihood ratio test
+anova(fit_gppiece_it, fit_gp_it)
+anova(fit_gppiece_it, fit_exp_it)
+#anova(fit_gp_it, fit_exp_it)
+
+
+
 
 ## Threshold selection based on metric proposed in Varty et al.
 ## arXiv:2102.00884

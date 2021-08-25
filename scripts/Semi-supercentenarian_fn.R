@@ -907,7 +907,8 @@ exggp_cens <- function(par, dat, rightcens, slow){
 
 #' Nelson-Aalen estimator of the hazard for left-truncated right-censored observations
 #' 
-#' This estimator is an alternative to \code{survfit} from the \code{survival} package. It does not include a correction for ties.
+#' This function is an alternative to \code{survfit} from the \code{survival} package that handles left-truncation. 
+#' It does not include a correction for ties.
 #' 
 #' @param time vector of failure or censoring time
 #' @param lefttrunc vector of left truncation time
@@ -946,7 +947,7 @@ nelson.aalen <-
 
     prob <- sort(prob)
     # unique failure times
-    utimes <- unique(sort(time))
+    utimes <- unique(sort(time[!rightcens]))
     if(missing(tl)){
       tl <- utimes[1] 
       tl_index <- 1L
@@ -1073,6 +1074,73 @@ nelson.aalen <-
 #   class(tR) <- "confBands"
 #   return(tR)
 # }
+
+
+kaplan.meier <- 
+  function(time,
+           lefttrunc,
+           rightcens,
+           tl,
+           tu,
+           level = 0.95,
+           prob = c((1 - level)/2, 1 - (1 - level)/2)
+  ){
+    stopifnot(
+      length(lefttrunc) == length(rightcens),
+      length(lefttrunc) == length(time),
+      isTRUE(all(time > lefttrunc)), 
+      is.logical(rightcens),
+      length(prob) == 2L,
+      length(level) == 1L,
+      level > 0 & level < 1,
+      all(prob > 0, prob < 1))
+    
+    prob <- sort(prob)
+    # unique failure times
+    utimes <- unique(sort(time[!rightcens]))
+    if(missing(tl)){
+      tl <- utimes[1] 
+      tl_index <- 1L
+    } else{
+      if(!tl %in% utimes){
+        stop("Lower bound for time interval must be one of the observed failure times.")
+      }
+      tl_index <- which(utimes == tl)
+      if(!tl > 0){
+        stop("Failure time must be strictly positive")
+      }
+    }
+    if(missing(tu)){
+      tu_index <- length(utimes) - 1L
+      tu <- utimes[tu_index]
+    } else{
+      if(!tu %in% utimes){
+        stop("Upper bound for time interval must be one of the observed failure times.")
+        tu_index <- which(utimes == tu)
+      }
+    }
+    stopifnot(tl < tu)
+    risk <- fail <- vector(mode = "numeric",
+                           length = length(utimes))
+    for(i in seq_along(utimes)){
+      ti <- utimes[i]
+      #risk set: not failed or censored
+      risk[i] <- sum(I(lefttrunc < ti)*I(ti <= time))
+      #failures: how many death at ti
+      fail[i] <- sum(time[!rightcens] == ti)
+    }
+    # Kaplan-Meier estimator
+    km_surv <- cumprod(1-fail/risk)
+    # Variance estimator (Greenwood formula)
+    km_var <- km_surv^2*cumsum(fail/(risk*(risk-fail)))
+      return(list(
+      time = utimes,
+      n.event = fail,
+      n.risk = risk,
+      surv = km_surv,
+      var = km_var
+    ))
+  }
 
 cumhaz_gp <- function (x, 
                        time, 
